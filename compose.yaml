@@ -1,0 +1,35 @@
+# Local dev / standalone. On Castle, drop the `db` service and point
+# DATABASE_URL at Castle's provisioned Postgres; Castle's nginx provides TLS.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tandem
+      POSTGRES_PASSWORD: tandem
+      POSTGRES_DB: tandem
+    volumes:
+      - tandem_db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tandem"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://tandem:tandem@db:5432/tandem
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-production}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  tandem_db:

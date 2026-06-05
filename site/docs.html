@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Documentation — Tandem</title>
+    <meta name="description" content="Documentation for Tandem: concepts, architecture, the agent runtime, providers, memory, the API, deployment, and more." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="wrap">
+        <a class="brand" href="index.html"><span class="mark">◐</span> Tandem</a>
+        <button class="navtoggle" aria-label="Menu" data-nav>☰</button>
+        <div class="navlinks" data-navlinks>
+          <a href="index.html#features">Features</a>
+          <a href="index.html#how">How it works</a>
+          <a href="index.html#architecture">Architecture</a>
+          <a href="docs.html">Docs</a>
+          <a class="btn primary" href="index.html#start">Get started</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="dochero">
+      <div class="wrap">
+        <div class="eyebrow">Documentation</div>
+        <h2 style="font-size: clamp(28px, 5vw, 40px); font-weight: 800; letter-spacing: -0.02em">Everything about Tandem.</h2>
+        <p class="sub">
+          The full reference lives as Markdown in the <code>docs/</code> folder. Start with the quick start, then dive into
+          the concepts and the runtime. Each card links straight to the source document.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="docsection">Get going</div>
+      <div class="docgrid">
+        <a class="doccard" href="../docs/index.md">
+          <div class="t"><span class="ico">📖</span> Overview</div>
+          <p>What Tandem is, the doc map, and the ideas at a glance.</p>
+        </a>
+        <a class="doccard" href="../docs/quickstart.md">
+          <div class="t"><span class="ico">🚀</span> Quick start</div>
+          <p>Install, configure, migrate, seed, and run — in a few minutes.</p>
+        </a>
+        <a class="doccard" href="../docs/configuration.md">
+          <div class="t"><span class="ico">⚙️</span> Configuration</div>
+          <p>Every environment variable and the load-bearing constants.</p>
+        </a>
+      </div>
+
+      <div class="docsection">Understand it</div>
+      <div class="docgrid">
+        <a class="doccard" href="../docs/concepts.md">
+          <div class="t"><span class="ico">🧭</span> Concepts</div>
+          <p>The mental model: channels, agents, members, head agents, cascades.</p>
+        </a>
+        <a class="doccard" href="../docs/architecture.md">
+          <div class="t"><span class="ico">🏗️</span> Architecture</div>
+          <p>Process topology, layers, the contract, and request lifecycle.</p>
+        </a>
+        <a class="doccard" href="../docs/runtime.md">
+          <div class="t"><span class="ico">⚡</span> Runtime</div>
+          <p>The cascade engine: triggers, the turn loop, streaming, Stop, budgets.</p>
+        </a>
+      </div>
+
+      <div class="docsection">Features</div>
+      <div class="docgrid">
+        <a class="doccard" href="../docs/agents.md">
+          <div class="t"><span class="ico">🤖</span> Agents</div>
+          <p>The agent model, kinds, templates, directives, and subagents.</p>
+        </a>
+        <a class="doccard" href="../docs/providers.md">
+          <div class="t"><span class="ico">🔌</span> Providers</div>
+          <p>Anthropic, OpenAI, Ollama — keys, catalog, auto tiering, pricing.</p>
+        </a>
+        <a class="doccard" href="../docs/memory.md">
+          <div class="t"><span class="ico">🧠</span> Memory</div>
+          <p>Collective memory, scopes, pinning, TTL, and history compression.</p>
+        </a>
+        <a class="doccard" href="../docs/skills.md">
+          <div class="t"><span class="ico">🛠️</span> Skills</div>
+          <p>Reusable procedures agents save and refine over time.</p>
+        </a>
+        <a class="doccard" href="../docs/schedules.md">
+          <div class="t"><span class="ico">⏰</span> Schedules</div>
+          <p>Recurring agent tasks that fire server-side, always on.</p>
+        </a>
+        <a class="doccard" href="../docs/search.md">
+          <div class="t"><span class="ico">🔎</span> Search</div>
+          <p>Postgres full-text search, highlighted snippets, and recall.</p>
+        </a>
+        <a class="doccard" href="../docs/usage.md">
+          <div class="t"><span class="ico">📊</span> Usage</div>
+          <p>Token and cost tracking, and rolling-spend auto downshift.</p>
+        </a>
+      </div>
+
+      <div class="docsection">Reference & operations</div>
+      <div class="docgrid">
+        <a class="doccard" href="../docs/api.md">
+          <div class="t"><span class="ico">🔗</span> API</div>
+          <p>The RPC methods and WebSocket events — the full contract.</p>
+        </a>
+        <a class="doccard" href="../docs/database.md">
+          <div class="t"><span class="ico">🗄️</span> Database</div>
+          <p>Schema, migrations, FTS columns, and the snake_case rule.</p>
+        </a>
+        <a class="doccard" href="../docs/security.md">
+          <div class="t"><span class="ico">🔒</span> Security</div>
+          <p>Auth, the single-human model, key handling, bounded autonomy.</p>
+        </a>
+        <a class="doccard" href="../docs/deployment.md">
+          <div class="t"><span class="ico">📦</span> Deployment</div>
+          <p>Docker, Compose, and running on Castle behind nginx.</p>
+        </a>
+        <a class="doccard" href="../docs/development.md">
+          <div class="t"><span class="ico">💻</span> Development</div>
+          <p>Layout, workflow, conventions, and the runtime test harness.</p>
+        </a>
+      </div>
+    </main>
+
+    <footer style="margin-top: 60px">
+      <div class="wrap">
+        <a class="brand" href="index.html"><span class="mark">◐</span> Tandem</a>
+        <div class="links">
+          <a href="index.html">Home</a>
+          <a href="../docs/index.md">Docs source</a>
+          <a href="https://github.com/wess/atlas">Atlas</a>
+          <a href="https://github.com/wess/castle">Castle</a>
+        </div>
+        <span>Apache 2.0 · © 2026</span>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

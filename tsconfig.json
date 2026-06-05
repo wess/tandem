@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["bun", "react", "react-dom"],
+    "paths": {
+      "@atlas/config": ["./atlas/packages/config/index.ts"],
+      "@atlas/db": ["./atlas/packages/db/index.ts"],
+      "@atlas/server": ["./atlas/packages/server/index.ts"],
+      "@atlas/server/ws": ["./atlas/packages/server/ws/index.ts"],
+      "@atlas/server/sse": ["./atlas/packages/server/sse/index.ts"],
+      "@atlas/auth": ["./atlas/packages/auth/index.ts"],
+      "@atlas/auth/social": ["./atlas/packages/auth/social/index.ts"],
+      "@atlas/migrate": ["./atlas/packages/migrate/index.ts"],
+      "@atlas/ai": ["./atlas/packages/ai/index.ts"]
+    }
+  },
+  "include": ["server.ts", "src"]
+}
