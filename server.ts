@@ -5,17 +5,34 @@ import { authRoutes } from "./src/api/auth.ts";
 import { rpcRoute } from "./src/api/rpc.ts";
 import { wsHandlers } from "./src/api/ws.ts";
 import { config } from "./src/config.ts";
+import { db } from "./src/db/index.ts";
 import { ensureGeneral } from "./src/domain/channels.ts";
 import { pruneExpired } from "./src/domain/memory.ts";
 import { startScheduler } from "./src/domain/runtime/scheduler.ts";
+import { setupTandemSso } from "./src/sso/index.ts";
 
 await ensureGeneral();
 await pruneExpired();
 startScheduler();
 
+// Mount @atlas/sso only when all three OIDC env vars are present (Castle
+// injects them at install). Empty = SSO off, app behaves as before.
+const ssoRoutes =
+  config.ssoIssuer && config.ssoClientId && config.ssoClientSecret
+    ? await setupTandemSso(db, {
+        issuerUrl: config.ssoIssuer,
+        clientId: config.ssoClientId,
+        clientSecret: config.ssoClientSecret,
+      })
+    : [];
+
 const apiRoutes = [
-  get("/api/health", pipe((c) => json(c, 200, { ok: true, service: "tandemd" }))),
+  get(
+    "/api/health",
+    pipe((c) => json(c, 200, { ok: true, service: "tandemd" })),
+  ),
   ...authRoutes,
+  ...ssoRoutes,
   rpcRoute,
 ];
 const handleApi = router(...apiRoutes);

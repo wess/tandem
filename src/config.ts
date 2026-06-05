@@ -5,6 +5,11 @@ export const config = defineConfig({
   databaseUrl: env("DATABASE_URL", { default: "postgres://tandem:tandem@localhost:5432/tandem" }),
   dbPoolSize: env("DB_POOL_SIZE", { parse: Number, default: "5" }),
   authSecret: env("AUTH_SECRET", { default: "dev-secret-change-me" }),
+  // OIDC relying-party — when all three are set, the app mounts @atlas/sso
+  // and the login screen surfaces "Sign in with Castle". Empty = SSO off.
+  ssoIssuer: env("SSO_ISSUER", { default: "" }),
+  ssoClientId: env("SSO_CLIENT_ID", { default: "" }),
+  ssoClientSecret: env("SSO_CLIENT_SECRET", { default: "" }),
   anthropicKey: env("ANTHROPIC_API_KEY", { default: "" }),
   openaiKey: env("OPENAI_API_KEY", { default: "" }),
   ollamaUrl: env("OLLAMA_URL", { default: "http://127.0.0.1:11434" }),

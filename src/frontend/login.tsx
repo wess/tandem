@@ -1,10 +1,18 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 export const Login = ({ onSuccess }: { onSuccess: () => void }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sso, setSso] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/methods")
+      .then((r) => r.json())
+      .then((m: { sso?: boolean }) => setSso(Boolean(m.sso)))
+      .catch(() => setSso(false));
+  }, []);
 
   const submit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
@@ -44,6 +52,16 @@ export const Login = ({ onSuccess }: { onSuccess: () => void }) => {
         <button className="primary" type="submit" disabled={busy || !email || !password}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
+        {sso && (
+          <>
+            <div className="logindivider">
+              <span>or</span>
+            </div>
+            <button type="button" className="ssobtn" onClick={() => (window.location.href = "/auth/sso/login")}>
+              Sign in with Castle
+            </button>
+          </>
+        )}
       </form>
     </div>
   );

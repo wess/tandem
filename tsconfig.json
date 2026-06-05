@@ -21,6 +21,7 @@
       "@atlas/server/sse": ["./atlas/packages/server/sse/index.ts"],
       "@atlas/auth": ["./atlas/packages/auth/index.ts"],
       "@atlas/auth/social": ["./atlas/packages/auth/social/index.ts"],
+      "@atlas/sso": ["./atlas/packages/sso/index.ts"],
       "@atlas/migrate": ["./atlas/packages/migrate/index.ts"],
       "@atlas/ai": ["./atlas/packages/ai/index.ts"]
     }

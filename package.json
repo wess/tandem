@@ -2,6 +2,7 @@
   "name": "tandem",
   "type": "module",
   "private": true,
+  "version": "0.1.0",
   "scripts": {
     "dev": "bun --hot server.ts",
     "start": "bun server.ts",
