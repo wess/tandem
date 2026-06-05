@@ -33,9 +33,18 @@ export const requireAuth = pipe(async (c: Conn) => {
   return assign(c, { userId });
 });
 
-const cookieHeader = (jwt: string): string => {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${COOKIE}=${jwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${MAX_AGE}${secure}`;
+const cookieHeader = (jwt: string, secure: boolean): string => {
+  return `${COOKIE}=${jwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${MAX_AGE}${secure ? "; Secure" : ""}`;
+};
+
+// Mark the cookie `Secure` only when the request actually arrived over HTTPS.
+// Castle fronts apps on plain http://<app>.local, and a `Secure` cookie is
+// silently dropped over HTTP — which would break the session (login loop).
+// Trust the proxy's X-Forwarded-Proto; fall back to the request URL scheme.
+const isHttps = (req: Request): boolean => {
+  const xfp = req.headers.get("x-forwarded-proto");
+  if (xfp) return xfp.split(",")[0]?.trim().toLowerCase() === "https";
+  return new URL(req.url).protocol === "https:";
 };
 
 // Sign a session JWT and attach the set-cookie header. Shared by /api/login
@@ -43,7 +52,7 @@ const cookieHeader = (jwt: string): string => {
 // the WS upgrade and `requireAuth` expect.
 export const issueSessionCookie = async (c: Conn, userId: number): Promise<Conn> => {
   const jwt = await token.sign({ sub: userId }, config.authSecret, { expiresIn: MAX_AGE });
-  return putHeader(c, "set-cookie", cookieHeader(jwt));
+  return putHeader(c, "set-cookie", cookieHeader(jwt, isHttps(c.request)));
 };
 
 const ssoEnabled = (): boolean => Boolean(config.ssoIssuer && config.ssoClientId && config.ssoClientSecret);
