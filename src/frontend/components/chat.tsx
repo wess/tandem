@@ -1,4 +1,4 @@
-import { deleteAgent, openModal } from "../state/actions.ts";
+import { closeMembers, deleteAgent, openModal, toggleMembers, toggleSidebar } from "../state/actions.ts";
 import { useStore } from "../state/store.ts";
 import { Avatar } from "./agent/avatar.tsx";
 import { Composer } from "./composer.tsx";
@@ -22,6 +22,7 @@ export const Chat = () => {
   const channel = useStore((s) => s.channels.find((c) => c.id === channelId));
   const dmAgent = useStore((s) => (channel?.kind === "dm" ? s.agents.find((a) => a.id === channel.agentId) : undefined));
   const ready = useStore((s) => s.ready);
+  const membersOpen = useStore((s) => s.membersOpen);
 
   if (!ready) {
     return (
@@ -44,6 +45,9 @@ export const Chat = () => {
   return (
     <main className="chat">
       <header className="chathead">
+        <button type="button" className="iconbtn menubtn" title="Menu" onClick={toggleSidebar}>
+          <Icon name="menu" size={18} />
+        </button>
         <div className="chattitle">
           {channel.kind === "dm" ? (
             dmAgent && <Avatar agent={dmAgent} size={24} />
@@ -56,6 +60,11 @@ export const Chat = () => {
           {channel.topic && <span className="chattopic">{channel.topic}</span>}
         </div>
         <div className="headactions">
+          {showMembers && (
+            <button type="button" className="iconbtn membersbtn" title="Members" onClick={toggleMembers}>
+              <Icon name="users" size={16} />
+            </button>
+          )}
           <button
             type="button"
             className="iconbtn"
@@ -89,8 +98,11 @@ export const Chat = () => {
           <MessageList channelId={channelId} />
           <Composer />
         </div>
-        {showMembers && <Members channelId={channelId} />}
+        {showMembers && <Members channelId={channelId} open={membersOpen} />}
       </div>
+      {showMembers && membersOpen && (
+        <button type="button" className="scrim" aria-label="Close members" onClick={closeMembers} />
+      )}
     </main>
   );
 };

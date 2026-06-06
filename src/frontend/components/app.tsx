@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { openModal } from "../state/actions.ts";
+import { closeSidebar, openModal } from "../state/actions.ts";
 import { getState, type Modal as ModalState, useStore } from "../state/store.ts";
 import { AddAgent } from "./agent/add.tsx";
 import { Invite } from "./agent/invite.tsx";
@@ -38,6 +38,7 @@ const ModalHost = ({ modal }: { modal: ModalState }) => {
 
 export const App = () => {
   const modal = useStore((s) => s.modal);
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -53,6 +54,7 @@ export const App = () => {
 
   return (
     <div className="app">
+      {sidebarOpen && <button type="button" className="scrim" aria-label="Close menu" onClick={closeSidebar} />}
       <Sidebar />
       <Chat />
       {modal && <ModalHost modal={modal} />}

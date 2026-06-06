@@ -6,7 +6,7 @@ import { Icon } from "./icon.tsx";
 
 const providerLabel = (a: Agent): string => `${a.providerKind} · ${a.model}`;
 
-export const Members = ({ channelId }: { channelId: number }) => {
+export const Members = ({ channelId, open = false }: { channelId: number; open?: boolean }) => {
   const members = useStore((s) => s.membersByChannel[channelId]) ?? [];
   const typing = useStore((s) => s.typingByChannel[channelId]) ?? [];
   const channel = useStore((s) => s.channels.find((c) => c.id === channelId));
@@ -14,7 +14,7 @@ export const Members = ({ channelId }: { channelId: number }) => {
   const nameOf = (id: number | null): string | undefined => members.find((m) => m.id === id)?.name;
 
   return (
-    <aside className="members">
+    <aside className={`members${open ? " open" : ""}`}>
       <div className="memshead">
         <span>Members</span>
         <span className="count">{members.length}</span>

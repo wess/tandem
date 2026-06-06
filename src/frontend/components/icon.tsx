@@ -21,6 +21,7 @@ export type IconName =
   | "clock"
   | "chart"
   | "book"
+  | "menu"
   | "dot";
 
 const inner = (name: IconName): ReactNode => {
@@ -107,6 +108,8 @@ const inner = (name: IconName): ReactNode => {
           <path d="M9 8h6M9 12h5" />
         </>
       );
+    case "menu":
+      return <path d="M3 6h18M3 12h18M3 18h18" />;
     case "dot":
       return <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />;
   }

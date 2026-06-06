@@ -48,12 +48,13 @@ const Section = ({ title, onAdd, children }: { title: string; onAdd?: () => void
 
 export const Sidebar = () => {
   const channels = useStore((s) => s.channels);
+  const open = useStore((s) => s.sidebarOpen);
   const rooms = channels.filter((c) => c.kind === "channel");
   const projects = channels.filter((c) => c.kind === "project");
   const dms = channels.filter((c) => c.kind === "dm");
 
   return (
-    <nav className="sidebar">
+    <nav className={`sidebar${open ? " open" : ""}`}>
       <header className="brand">
         <div className="brandmark">◐</div>
         <span className="brandname">Tandem</span>

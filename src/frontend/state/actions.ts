@@ -14,7 +14,7 @@ export const boot = async (): Promise<void> => {
 };
 
 export const selectChannel = async (channelId: number): Promise<void> => {
-  setState({ activeChannelId: channelId });
+  setState({ activeChannelId: channelId, sidebarOpen: false, membersOpen: false });
   if (getState().messagesByChannel[channelId] !== undefined) return;
 
   // Mark loaded synchronously so events during the fetch aren't dropped, then merge.
@@ -136,3 +136,9 @@ export const deleteSchedule = (id: number): Promise<unknown> => invoke("schedule
 
 export const openModal = (modal: Modal): void => setState({ modal });
 export const closeModal = (): void => setState({ modal: null });
+
+// Mobile drawer toggles (sidebar nav + members aside slide-ins).
+export const toggleSidebar = (): void => setState((s) => ({ ...s, sidebarOpen: !s.sidebarOpen }));
+export const closeSidebar = (): void => setState({ sidebarOpen: false });
+export const toggleMembers = (): void => setState((s) => ({ ...s, membersOpen: !s.membersOpen }));
+export const closeMembers = (): void => setState({ membersOpen: false });

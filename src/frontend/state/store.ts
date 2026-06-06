@@ -23,6 +23,8 @@ export type State = {
   membersByChannel: Record<number, Agent[]>;
   typingByChannel: Record<number, number[]>;
   modal: Modal | null;
+  sidebarOpen: boolean;
+  membersOpen: boolean;
 };
 
 const initial: State = {
@@ -36,6 +38,8 @@ const initial: State = {
   membersByChannel: {},
   typingByChannel: {},
   modal: null,
+  sidebarOpen: false,
+  membersOpen: false,
 };
 
 let state = initial;
