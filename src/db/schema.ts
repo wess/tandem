@@ -8,6 +8,7 @@ import { column, defineSchema, type RowOf } from "@atlas/db";
 export const users = defineSchema("users", {
   id: column.serial().primaryKey(),
   email: column.text().unique(),
+  username: column.text().nullable(),
   name: column.text().default(""),
   password: column.text(),
   created_at: column.timestamp(),
@@ -15,7 +16,8 @@ export const users = defineSchema("users", {
 
 export const agents = defineSchema("agents", {
   id: column.serial().primaryKey(),
-  handle: column.text().unique(),
+  owner_id: column.integer(),
+  handle: column.text(),
   name: column.text(),
   blurb: column.text().default(""),
   avatar: column.text().default(""),
@@ -30,7 +32,8 @@ export const agents = defineSchema("agents", {
 
 export const channels = defineSchema("channels", {
   id: column.serial().primaryKey(),
-  slug: column.text().unique(),
+  owner_id: column.integer(),
+  slug: column.text(),
   name: column.text(),
   kind: column.text().default("channel"),
   topic: column.text().default(""),
@@ -43,6 +46,7 @@ export const channels = defineSchema("channels", {
 
 export const members = defineSchema("members", {
   id: column.serial().primaryKey(),
+  owner_id: column.integer(),
   channel_id: column.integer(),
   agent_id: column.integer(),
   created_at: column.timestamp(),
@@ -50,6 +54,7 @@ export const members = defineSchema("members", {
 
 export const messages = defineSchema("messages", {
   id: column.serial().primaryKey(),
+  owner_id: column.integer(),
   channel_id: column.integer(),
   author_type: column.text().default("human"),
   author_id: column.integer().nullable(),
@@ -61,6 +66,7 @@ export const messages = defineSchema("messages", {
 
 export const memories = defineSchema("memories", {
   id: column.serial().primaryKey(),
+  owner_id: column.integer(),
   scope: column.text().default("channel"),
   channel_id: column.integer().nullable(),
   author_id: column.integer().nullable(),
@@ -74,7 +80,8 @@ export const memories = defineSchema("memories", {
 
 export const skills = defineSchema("skills", {
   id: column.serial().primaryKey(),
-  name: column.text().unique(),
+  owner_id: column.integer(),
+  name: column.text(),
   description: column.text().default(""),
   steps: column.text().default(""),
   author_id: column.integer().nullable(),
@@ -85,6 +92,7 @@ export const skills = defineSchema("skills", {
 
 export const schedules = defineSchema("schedules", {
   id: column.serial().primaryKey(),
+  owner_id: column.integer(),
   channel_id: column.integer(),
   agent_id: column.integer(),
   prompt: column.text(),
@@ -97,6 +105,7 @@ export const schedules = defineSchema("schedules", {
 
 export const usagelog = defineSchema("usagelog", {
   id: column.serial().primaryKey(),
+  owner_id: column.integer(),
   agent_id: column.integer().nullable(),
   channel_id: column.integer(),
   model: column.text(),
@@ -106,7 +115,11 @@ export const usagelog = defineSchema("usagelog", {
   created_at: column.bigint(),
 });
 
+// Per-user settings (provider keys + overrides). The real DB primary key is the
+// composite (owner_id, key) — enforced in the migration; `key` keeps the
+// builder's primaryKey marker for query typing.
 export const settings = defineSchema("settings", {
+  owner_id: column.integer(),
   key: column.text().primaryKey(),
   value: column.text().default(""),
 });

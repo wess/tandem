@@ -23,6 +23,15 @@ const claimName = (claims: IdTokenClaims, email: string): string => {
   return uname || (email.split("@")[0] ?? email);
 };
 
+// Carry the IdP's preferred_username into the local row so username login works
+// for SSO accounts too. Returns null if it can't be normalized to a valid handle.
+const claimUsername = (claims: IdTokenClaims): string | null => {
+  const raw = (claims.preferred_username as string | undefined)?.trim().toLowerCase();
+  if (!raw) return null;
+  const u = raw.replace(/[^a-z0-9_]/g, "_").slice(0, 32);
+  return /^[a-z0-9_]{3,32}$/.test(u) ? u : null;
+};
+
 // SSO-only users get a fixed un-verifiable password hash so local login is
 // rejected (verify() fails on it) — the only path in is via /auth/sso/login.
 const placeholderHash = (): Promise<string> => hash(`disabled-local-password-${Math.random().toString(36)}`);
@@ -30,6 +39,7 @@ const placeholderHash = (): Promise<string> => hash(`disabled-local-password-${M
 const upsertUser = async (db: Connection, claims: IdTokenClaims): Promise<{ id: number; name: string }> => {
   const email = claimEmail(claims);
   const name = claimName(claims, email);
+  const username = claimUsername(claims);
 
   const existing = (await db.one(
     from(users)
@@ -41,15 +51,17 @@ const upsertUser = async (db: Connection, claims: IdTokenClaims): Promise<{ id: 
     await db.execute(
       from(users)
         .where((q) => q("id").equals(existing.id))
-        .update({ name }),
+        .update(username ? { name, username } : { name }),
     );
     return { id: existing.id, name };
   }
 
   const password = await placeholderHash();
-  const inserted = (await db.execute(from(users).insert({ email, name, password }).returning("id"))) as Array<{
-    id: number;
-  }>;
+  const inserted = (await db.execute(
+    from(users)
+      .insert({ email, name, password, ...(username ? { username } : {}) })
+      .returning("id"),
+  )) as Array<{ id: number }>;
   const row = inserted[0];
   if (!row) throw new Error("user insert failed");
   return { id: row.id, name };
