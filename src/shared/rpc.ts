@@ -10,6 +10,7 @@ import type {
   Schedule,
   SearchHit,
   Skill,
+  TeamSuggestion,
   UsageStats,
 } from "./types.ts";
 
@@ -65,6 +66,8 @@ export type RpcMap = {
   };
   "schedules:delete": { input: { id: number }; output: { id: number } };
   "usage:stats": { input: void; output: UsageStats };
+  "team:suggest": { input: { goal: string }; output: TeamSuggestion };
+  "team:create": { input: { suggestion: TeamSuggestion }; output: { channel: Channel; members: Agent[] } };
 };
 
 export type RpcMethod = keyof RpcMap;

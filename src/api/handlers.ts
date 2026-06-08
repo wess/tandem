@@ -32,6 +32,7 @@ import {
 } from "../domain/schedules.ts";
 import { search } from "../domain/search.ts";
 import { AGENT_TEMPLATES } from "../domain/seeds.ts";
+import { createTeam, suggestTeam } from "../domain/team.ts";
 import { listSkills, removeSkill, saveSkill, toSkill } from "../domain/skills.ts";
 import { usageStats } from "../domain/usage.ts";
 import type { RpcMap, RpcMethod } from "../shared/rpc.ts";
@@ -240,4 +241,16 @@ export const handlers: Handlers = {
   },
 
   "usage:stats": (_input, { userId }) => usageStats(userId),
+
+  // Propose a project + team from a plain-language goal (reusing existing agents
+  // where they fit). Read-only — nothing is created until team:create.
+  "team:suggest": ({ goal }, { userId }) => suggestTeam(userId, goal),
+
+  "team:create": async ({ suggestion }, { userId }) => {
+    const { channel, newAgents, members } = await createTeam(userId, suggestion);
+    for (const a of newAgents) broadcast("agent:created", a, userId);
+    broadcast("channel:created", channel, userId);
+    broadcast("members:changed", { channelId: channel.id, members }, userId);
+    return { channel, members };
+  },
 };

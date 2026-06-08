@@ -1646,3 +1646,133 @@ select {
     opacity: 1;
   }
 }
+
+/* ----- Suggest a team (new-project modal) ----- */
+.teamtabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+.teamtabs button {
+  flex: 1;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 12.5px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+}
+.teamtabs button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.formerror {
+  color: #f87171;
+  font-size: 12.5px;
+}
+.formfoot .ghost {
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: auto;
+}
+.formfoot .ghost:hover {
+  color: var(--text);
+}
+.teampreview {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 13px;
+}
+.teamhead {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.teamname {
+  font-weight: 700;
+  color: var(--text);
+}
+.teamrationale {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.teammembers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.teammembers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.teamavatar {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.teamwho {
+  flex: 1;
+  min-width: 0;
+}
+.teamwho b {
+  color: var(--text);
+  font-size: 13px;
+}
+.teamhandle {
+  color: var(--text-faint);
+  font-weight: 500;
+  font-size: 12px;
+  margin-left: 4px;
+}
+.teamrole {
+  display: block;
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: 1px;
+}
+.teambadges {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.teambadge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+}
+.teambadge.lead {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+}
+.teambadge.reuse {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 50%, transparent);
+}
+.teambadge.fresh {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}

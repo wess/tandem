@@ -1,4 +1,4 @@
-import type { AgentKind, AgentTemplate, ProviderKind, SearchHit } from "../../shared/types.ts";
+import type { AgentKind, AgentTemplate, ProviderKind, SearchHit, TeamSuggestion } from "../../shared/types.ts";
 import { invoke } from "../transport.ts";
 import { getState, type Modal, patchChannelMessages, setState } from "./store.ts";
 
@@ -93,6 +93,24 @@ export const createProject = async (name: string, topic: string): Promise<void> 
   ensureChannel(ch);
   closeModal();
   await selectChannel(ch.id);
+};
+
+// Ask the model to propose a project + team from a goal (read-only preview).
+export const suggestTeam = (goal: string): Promise<TeamSuggestion> => invoke("team:suggest", { goal });
+
+// Create the reviewed team: a project channel with the lead + members (existing
+// agents reused, new ones created). New agents arrive via WS too; we also fold
+// them in directly so the member list renders without waiting on the socket.
+export const createTeamFromSuggestion = async (suggestion: TeamSuggestion): Promise<void> => {
+  const { channel, members } = await invoke("team:create", { suggestion });
+  setState((s) => {
+    const known = new Set(s.agents.map((a) => a.id));
+    const added = members.filter((m) => !known.has(m.id));
+    return added.length ? { ...s, agents: [...s.agents, ...added] } : s;
+  });
+  ensureChannel(channel);
+  closeModal();
+  await selectChannel(channel.id);
 };
 
 export const invite = (channelId: number, agentId: number): Promise<unknown> =>

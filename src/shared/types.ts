@@ -137,3 +137,28 @@ export type Bootstrap = {
   providers: ProviderConfig[];
   templates: AgentTemplate[];
 };
+
+// One proposed teammate. `reuse` means an existing agent (matched by handle)
+// joins the team as-is; otherwise a new agent is created from these fields.
+export type SuggestedMember = {
+  reuse: boolean;
+  lead: boolean;
+  handle: string;
+  name: string;
+  role: string;
+  blurb?: string;
+  avatar?: string;
+  color?: string;
+  providerKind?: ProviderKind;
+  model?: string;
+  systemPrompt?: string;
+};
+
+// A proposed project + its team, generated from a plain-language goal. The user
+// reviews/edits before it's created.
+export type TeamSuggestion = {
+  name: string;
+  topic: string;
+  rationale: string;
+  members: SuggestedMember[];
+};

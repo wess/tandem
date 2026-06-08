@@ -9,7 +9,8 @@
 // Run: DATABASE_URL=... OLLAMA_URL=http://localhost:11500 bun test/runtime.ts
 
 import { getAgentById, insertAgent, listAgents } from "../src/domain/agents.ts";
-import { addMemberRow, createProjectRow, openDmRow, setHeadAgent } from "../src/domain/channels.ts";
+import { addMemberRow, createProjectRow, listMembers, openDmRow, setHeadAgent } from "../src/domain/channels.ts";
+import { createTeam, suggestTeam } from "../src/domain/team.ts";
 import { onEvent, type Outgoing } from "../src/domain/events.ts";
 import { listMemories } from "../src/domain/memory.ts";
 import { insertMessage, listMessageRows } from "../src/domain/messages.ts";
@@ -26,6 +27,18 @@ import { channels, db, from, insertRow, schedules, users } from "../src/db/index
 const reply = (system: string, msgs: { role: string; content: string }[]): string => {
   const hasAssistant = msgs.some((m) => m.role === "assistant");
   const lastUser = [...msgs].reverse().find((m) => m.role === "user")?.content ?? "";
+  // Team-suggestion request → return strict JSON that reuses @llama and adds two new agents.
+  if (/team architect/i.test(system))
+    return JSON.stringify({
+      name: "research-report",
+      topic: "Research and write a report",
+      rationale: "Reuse llama to draft; add a lead to coordinate and a fact-checker.",
+      members: [
+        { reuse: false, lead: true, handle: "lead", name: "Lead", role: "coordinate the team", blurb: "orchestrator", avatar: "🎯", providerKind: "ollama", model: "auto", systemPrompt: "You coordinate." },
+        { reuse: true, lead: false, handle: "llama", name: "Llama", role: "draft the report" },
+        { reuse: false, lead: false, handle: "checker", name: "Checker", role: "verify facts", blurb: "fact checker", avatar: "🔍", providerKind: "ollama", model: "auto", systemPrompt: "You verify facts." },
+      ],
+    });
   const isHead = /HEAD of this channel/.test(system);
   if (isHead && !hasAssistant)
     return "SPAWN: researcher :: investigate the question\n@researcher please dig into this.\nOn it — delegating now.";
@@ -319,6 +332,35 @@ console.log("\n[H] Tenant isolation");
   ok("other tenant search is empty", (await search(other.id, "Tandem")).length === 0);
   ok("other tenant sees no memory", (await listMemories(other.id, dm.id)).length === 0);
   ok("other tenant usage is zero", (await usageStats(other.id)).totalTokens === 0);
+}
+
+// ----------------------------------------------------------------- I: suggest a team (with reuse) → create
+console.log("\n[I] Team suggestion → create (reusing existing agents)");
+{
+  const suggestion = await suggestTeam(ownerId, "Research the widget market and write a report.");
+  ok("suggestion has >= 2 members", suggestion.members.length >= 2, `got ${suggestion.members.length}`);
+  ok("exactly one lead", suggestion.members.filter((m) => m.lead).length === 1);
+  ok(
+    "reuses existing @llama",
+    suggestion.members.some((m) => m.reuse && m.handle === "llama"),
+    JSON.stringify(suggestion.members.map((m) => [m.handle, m.reuse])),
+  );
+  ok("proposes at least one new agent", suggestion.members.some((m) => !m.reuse));
+
+  const agentsBefore = (await listAgents(ownerId)).length;
+  const created = await createTeam(ownerId, suggestion);
+  ok("team channel created", created.channel.id > 0);
+  const teamMembers = await listMembers(ownerId, created.channel.id);
+  ok("all members added to the channel", teamMembers.length === suggestion.members.length, `got ${teamMembers.length}`);
+  ok("@llama reused, not duplicated", (await listAgents(ownerId)).filter((a) => a.handle === "llama").length === 1);
+  const agentsAfter = (await listAgents(ownerId)).length;
+  ok("only the new agents were created", agentsAfter === agentsBefore + created.newAgents.length,
+    `${agentsBefore}+${created.newAgents.length} vs ${agentsAfter}`);
+  const headRow = await db.one<{ head_agent_id: number | null }>(
+    from(channels).where((q) => q("id").equals(created.channel.id)).select("head_agent_id"),
+  );
+  ok("head set to a team member", headRow?.head_agent_id != null && teamMembers.some((m) => m.id === headRow.head_agent_id),
+    String(headRow?.head_agent_id));
 }
 
 // ----------------------------------------------------------------- summary
