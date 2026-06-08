@@ -30,16 +30,18 @@ const ProviderCard = ({ p }: { p: ProviderConfig }) => {
     <div className="provcard">
       <div className="provhead">
         <span className="provname">{p.label}</span>
-        <span className={`status ${p.needsKey ? (p.hasKey ? "ok" : "bad") : "ok"}`}>
-          {p.needsKey ? (p.hasKey ? "Key set" : "No key") : "Local"}
+        <span className={`status ${p.needsKey && !p.hasKey ? "bad" : "ok"}`}>
+          {p.needsKey ? (p.hasKey ? "Key set" : "No key") : p.hasKey ? "Cloud" : "Local"}
         </span>
       </div>
-      {p.needsKey && (
+      {(p.needsKey || p.supportsKey) && (
         <div className="provfield">
           <input
             type="password"
             value={key}
-            placeholder={p.hasKey ? "Replace API key…" : "Paste API key…"}
+            placeholder={
+              p.needsKey ? (p.hasKey ? "Replace API key…" : "Paste API key…") : "API key (Ollama Cloud — optional)…"
+            }
             onChange={(e) => setKey(e.target.value)}
           />
           <button type="button" className="ghostbtn" disabled={!key.trim()} onClick={() => void saveKey()}>
@@ -50,19 +52,26 @@ const ProviderCard = ({ p }: { p: ProviderConfig }) => {
       <div className="provrow">
         <label className="mini">
           Default model
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
+          <input
+            list={`models-${p.kind}`}
+            value={model}
+            placeholder="model name"
+            onChange={(e) => setModel(e.target.value)}
+          />
+          <datalist id={`models-${p.kind}`}>
             {p.models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+              <option key={m} value={m} />
             ))}
-          </select>
+          </datalist>
         </label>
         <label className="mini">
           Base URL
           <input value={baseURL} placeholder="default" onChange={(e) => setBaseURL(e.target.value)} />
         </label>
       </div>
+      {p.kind === "ollama" && (
+        <p className="hint">Ollama Cloud: set Base URL to https://ollama.com and paste your API key above.</p>
+      )}
       <div className="provfoot">
         <button type="button" className="ghostbtn" onClick={() => void saveCfg()}>
           Save

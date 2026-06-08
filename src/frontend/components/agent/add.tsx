@@ -108,12 +108,7 @@ const Custom = () => {
         Avatar
         <div className="picker">
           {EMOJIS.map((e) => (
-            <button
-              type="button"
-              key={e}
-              className={`emoji${e === avatar ? " on" : ""}`}
-              onClick={() => setAvatar(e)}
-            >
+            <button type="button" key={e} className={`emoji${e === avatar ? " on" : ""}`} onClick={() => setAvatar(e)}>
               {e}
             </button>
           ))}
@@ -149,13 +144,17 @@ const Custom = () => {
         </label>
         <label>
           Model
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
+          <input
+            list={`agent-model-${providerKind}`}
+            value={model}
+            placeholder="model name (e.g. llama3.2)"
+            onChange={(e) => setModel(e.target.value)}
+          />
+          <datalist id={`agent-model-${providerKind}`}>
             {modelOptions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+              <option key={m} value={m} />
             ))}
-          </select>
+          </datalist>
         </label>
       </div>
 

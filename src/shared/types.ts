@@ -144,8 +144,9 @@ export type ProviderConfig = {
   label: string;
   baseURL: string; // "" => the provider's default endpoint
   defaultModel: string;
-  models: string[];
+  models: string[]; // suggestions only — any model name is accepted (free text)
   needsKey: boolean; // ollama runs locally and needs none
+  supportsKey: boolean; // a key is accepted but optional (e.g. Ollama Cloud)
   hasKey: boolean;
 };
 

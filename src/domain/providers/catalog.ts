@@ -2,16 +2,18 @@ import type { ProviderKind } from "../../shared/types.ts";
 
 type Spec = {
   label: string;
-  needsKey: boolean;
+  needsKey: boolean; // a key is REQUIRED to use the provider at all
+  supportsKey: boolean; // a key is ACCEPTED (e.g. Ollama Cloud) but not required
   baseURL: string; // "" => use the adapter's built-in default endpoint
   defaultModel: string;
-  models: string[];
+  models: string[]; // suggestions only — any model name is accepted (free text)
 };
 
 export const PROVIDER_CATALOG: Record<ProviderKind, Spec> = {
   anthropic: {
     label: "Anthropic",
     needsKey: true,
+    supportsKey: true,
     baseURL: "",
     defaultModel: "claude-opus-4-8",
     models: ["auto", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
@@ -19,16 +21,20 @@ export const PROVIDER_CATALOG: Record<ProviderKind, Spec> = {
   openai: {
     label: "OpenAI",
     needsKey: true,
+    supportsKey: true,
     baseURL: "",
     models: ["auto", "gpt-4o", "gpt-4o-mini", "o4-mini"],
     defaultModel: "gpt-4o",
   },
   ollama: {
+    // Local by default (no key). Set an API key + base URL https://ollama.com to
+    // use Ollama Cloud — buildProvider then talks the OpenAI-compatible endpoint.
     label: "Ollama",
     needsKey: false,
+    supportsKey: true,
     baseURL: "http://127.0.0.1:11434",
     defaultModel: "llama3.2",
-    models: ["auto", "llama3.2", "qwen2.5", "mistral", "phi3"],
+    models: ["auto", "llama3.2", "qwen2.5", "mistral", "phi3", "gpt-oss:120b", "qwen3-coder:480b"],
   },
 };
 

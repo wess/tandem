@@ -44,7 +44,8 @@ export const providerConfig = async (ownerId: number, kind: ProviderKind): Promi
     defaultModel: await modelFor(ownerId, kind),
     models: spec.models,
     needsKey: spec.needsKey,
-    hasKey: spec.needsKey ? Boolean(await apiKeyFor(ownerId, kind)) : true,
+    supportsKey: spec.supportsKey,
+    hasKey: Boolean(await apiKeyFor(ownerId, kind)),
   };
 };
 
@@ -53,7 +54,14 @@ export const providerConfigs = (ownerId: number): Promise<ProviderConfig[]> =>
 
 export const buildProvider = async (ownerId: number, kind: ProviderKind): Promise<AiProvider> => {
   const baseUrl = (await baseUrlFor(ownerId, kind)) || undefined;
-  if (kind === "ollama") return createProvider({ provider: "ollama", baseUrl });
+  if (kind === "ollama") {
+    // Ollama Cloud: when a key is set, talk the OpenAI-compatible endpoint
+    // (set base URL to https://ollama.com). No key => the local Ollama daemon.
+    const cloudKey = await apiKeyFor(ownerId, "ollama");
+    return cloudKey
+      ? createProvider({ provider: "openai", key: cloudKey, baseUrl })
+      : createProvider({ provider: "ollama", baseUrl });
+  }
   const key = await apiKeyFor(ownerId, kind);
   if (!key) throw new Error(`No API key set for ${PROVIDER_CATALOG[kind].label}. Add one in Settings.`);
   if (kind === "anthropic") return createProvider({ provider: "anthropic", key });
