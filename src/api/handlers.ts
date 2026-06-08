@@ -10,14 +10,16 @@ import {
   listMembers,
   openDmRow,
   removeChannel,
-  removeMembershipsForAgent,
   removeMemberRow,
+  removeMembershipsForAgent,
   setHeadAgent,
   toChannel,
 } from "../domain/channels.ts";
 import { broadcast } from "../domain/events.ts";
+import { getPending, resolve as resolveApproval } from "../domain/mcp/approvals.ts";
 import { listMemories, removeMemory, setPinned, toMemory } from "../domain/memory.ts";
 import { insertMessage, listMessages, toMessage } from "../domain/messages.ts";
+import { getChannelProject, setChannelProject } from "../domain/projects.ts";
 import { providerConfig, providerConfigs, setApiKey, setProviderOverride } from "../domain/providers/index.ts";
 import { compressChannel } from "../domain/runtime/compress.ts";
 import { abortChannel, dispatch, startCascade } from "../domain/runtime/index.ts";
@@ -32,8 +34,8 @@ import {
 } from "../domain/schedules.ts";
 import { search } from "../domain/search.ts";
 import { AGENT_TEMPLATES } from "../domain/seeds.ts";
-import { createTeam, suggestTeam } from "../domain/team.ts";
 import { listSkills, removeSkill, saveSkill, toSkill } from "../domain/skills.ts";
+import { createTeam, maybeSuggestTeamForGoal, suggestTeam } from "../domain/team.ts";
 import { usageStats } from "../domain/usage.ts";
 import type { RpcMap, RpcMethod } from "../shared/rpc.ts";
 
@@ -70,9 +72,14 @@ export const handlers: Handlers = {
   "members:list": ({ channelId }, { userId }) => listMembers(userId, channelId),
 
   "messages:send": async ({ channelId, content }, { userId }) => {
-    await ownChannel(userId, channelId);
+    const channel = await ownChannel(userId, channelId);
     const row = await insertMessage({ ownerId: userId, channelId, authorType: "human", content });
     void dispatch(row, startCascade(channelId));
+    // M1.5 — if this is the first substantive message in an agentless channel,
+    // propose a team for it (async; the LLM round-trip must not delay the send).
+    void maybeSuggestTeamForGoal(userId, channel, row).then((payload) => {
+      if (payload) broadcast("team:suggested", payload, userId);
+    });
     return toMessage(row);
   },
 
@@ -253,4 +260,61 @@ export const handlers: Handlers = {
     broadcast("members:changed", { channelId: channel.id, members }, userId);
     return { channel, members };
   },
+
+  // M5.1 — read the project-state link for a channel (null until one exists).
+  "project:get": async ({ channelId }, { userId }) => {
+    await ownChannel(userId, channelId);
+    return getChannelProject(userId, channelId);
+  },
+
+  // Upsert the link (owner_id from the session, never the body) and fan the
+  // result out to the owner's sockets.
+  "project:set": async ({ channelId, patch }, { userId }) => {
+    await ownChannel(userId, channelId);
+    const project = await setChannelProject(userId, channelId, patch);
+    broadcast("project:updated", project, userId);
+    return project;
+  },
+
+  // Task #15 — resolve a parked destructive MCP tool call. Ownership is enforced
+  // off the parked action's own ownerId (never the body): a caller may only
+  // resolve approvals minted in their own workspace. On approve we run the held
+  // call and post its result as a system message; on deny we post a denial. A
+  // post + broadcast keeps the channel transcript the source of truth (the model
+  // sees the system message on its next turn).
+  "approvals:resolve": async ({ approvalId, approve }, { userId }) => {
+    const action = getPending(approvalId);
+    if (!action || action.ownerId !== userId) return { approvalId, found: false };
+
+    const post = async (text: string): Promise<void> => {
+      const sys = await insertMessage({
+        ownerId: userId,
+        channelId: action.channelId,
+        authorType: "system",
+        content: text,
+      });
+      broadcast("message:created", toMessage(sys), userId);
+    };
+
+    if (!approve) {
+      await resolveApproval(approvalId, false);
+      await post(`Denied: \`${action.tool}\` was not run (request ${approvalId}).`);
+      return { approvalId, found: true };
+    }
+
+    try {
+      const outcome = await resolveApproval(approvalId, true);
+      const result = outcome.found && outcome.approved ? outcome.result : "(no result)";
+      await post(`Approved and ran \`${action.tool}\` (request ${approvalId}). Result:\n${result}`);
+    } catch (err) {
+      await post(`Approval for \`${action.tool}\` failed to run (request ${approvalId}): ${reason(err)}`);
+    }
+    return { approvalId, found: true };
+  },
+};
+
+// Trim an error for a system-message surface.
+const reason = (err: unknown): string => {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.length > 240 ? `${msg.slice(0, 240)}…` : msg;
 };

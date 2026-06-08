@@ -94,4 +94,42 @@ export const initEvents = (): void => {
       return { ...s, typingByChannel: { ...s.typingByChannel, [channelId]: next } };
     });
   });
+
+  // M1.5 — a server-side goal in an agentless channel produced a team proposal.
+  // Park it on the channel so a prompt can render. accept/dismiss live in
+  // state/actions.ts (acceptTeamSuggestion / dismissTeamSuggestion); the accept
+  // prompt renders off this in components/channel/teamsuggestion.tsx.
+  on("team:suggested", (payload) => {
+    setState((s) => ({
+      ...s,
+      teamSuggestionByChannel: { ...s.teamSuggestionByChannel, [payload.channelId]: payload },
+    }));
+  });
+
+  // M5.1 — the channel↔artifact link changed (project:set). Park it by channel so
+  // a project panel can render the live repo/deploy state off projectByChannel.
+  on("project:updated", (project) => {
+    setState((s) => ({
+      ...s,
+      projectByChannel: { ...s.projectByChannel, [project.channelId]: project },
+    }));
+  });
+
+  // Task #15 — a destructive MCP tool call was parked pending human approval.
+  // Park it by channel + approvalId so the channel view renders an approve/deny
+  // prompt (components/channel/approval.tsx); resolveApproval (state/actions.ts)
+  // clears it and calls the RPC. The server also posts a system message, so the
+  // transcript reflects the request alongside the prompt.
+  on("approval:requested", (req) => {
+    setState((s) => {
+      const forChannel = s.approvalsByChannel[req.channelId] ?? {};
+      return {
+        ...s,
+        approvalsByChannel: {
+          ...s.approvalsByChannel,
+          [req.channelId]: { ...forChannel, [req.approvalId]: req },
+        },
+      };
+    });
+  });
 };

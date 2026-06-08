@@ -1,4 +1,12 @@
-import type { AgentKind, AgentTemplate, ProviderKind, SearchHit, TeamSuggestion } from "../../shared/types.ts";
+import type {
+  AgentKind,
+  AgentTemplate,
+  ChannelProject,
+  ChannelProjectPatch,
+  ProviderKind,
+  SearchHit,
+  TeamSuggestion,
+} from "../../shared/types.ts";
 import { invoke } from "../transport.ts";
 import { getState, type Modal, patchChannelMessages, setState } from "./store.ts";
 
@@ -15,6 +23,7 @@ export const boot = async (): Promise<void> => {
 
 export const selectChannel = async (channelId: number): Promise<void> => {
   setState({ activeChannelId: channelId, sidebarOpen: false, membersOpen: false });
+  void hydrateProject(channelId);
   if (getState().messagesByChannel[channelId] !== undefined) return;
 
   // Mark loaded synchronously so events during the fetch aren't dropped, then merge.
@@ -113,6 +122,40 @@ export const createTeamFromSuggestion = async (suggestion: TeamSuggestion): Prom
   await selectChannel(channel.id);
 };
 
+// M1.5 — a server-proposed team (from "team:suggested") landed on a channel.
+// Dismiss just clears it; accept creates the team (a new project channel) from
+// the suggestion and drops the prompt. The originating channel keeps its message
+// either way — the suggestion is an additive offer, not a redirect.
+export const dismissTeamSuggestion = (channelId: number): void => {
+  setState((s) => {
+    if (!(channelId in s.teamSuggestionByChannel)) return s;
+    const teamSuggestionByChannel = { ...s.teamSuggestionByChannel };
+    delete teamSuggestionByChannel[channelId];
+    return { ...s, teamSuggestionByChannel };
+  });
+};
+
+export const acceptTeamSuggestion = async (channelId: number): Promise<void> => {
+  const pending = getState().teamSuggestionByChannel[channelId];
+  if (!pending) return;
+  dismissTeamSuggestion(channelId);
+  await createTeamFromSuggestion(pending.suggestion);
+};
+
+// Task #15 — resolve a parked destructive MCP tool call. The server runs (on
+// approve) or skips (on deny) the held call and posts the outcome as a system
+// message; we optimistically drop the prompt from the channel either way.
+export const resolveApproval = async (channelId: number, approvalId: string, approve: boolean): Promise<void> => {
+  setState((s) => {
+    const forChannel = s.approvalsByChannel[channelId];
+    if (!forChannel || !(approvalId in forChannel)) return s;
+    const next = { ...forChannel };
+    delete next[approvalId];
+    return { ...s, approvalsByChannel: { ...s.approvalsByChannel, [channelId]: next } };
+  });
+  await invoke("approvals:resolve", { approvalId, approve });
+};
+
 export const invite = (channelId: number, agentId: number): Promise<unknown> =>
   invoke("members:add", { channelId, agentId });
 export const removeMember = (channelId: number, agentId: number): Promise<unknown> =>
@@ -133,6 +176,26 @@ export const pinMemory = (id: number, pinned: boolean): Promise<unknown> => invo
 export const compressChannel = (channelId: number) => invoke("channels:compress", { channelId });
 
 export const runSearch = (query: string): Promise<SearchHit[]> => invoke("search", { query });
+
+// M5.1 — the channel↔artifact project-state link. Read returns null until a row
+// exists; set upserts and the server fans a "project:updated" event back out.
+export const getChannelProject = (channelId: number): Promise<ChannelProject | null> =>
+  invoke("project:get", { channelId });
+
+// Pull a channel's project row into the store on select so the project panel
+// renders without waiting on an event. Guards two ways: skips if we already hold
+// the row (project:updated keeps it fresh after the first read), and skips for
+// non-project channels so plain channels/DMs don't spend an RPC. A null result
+// (no row) is left absent — the panel renders nothing, which is the parity case.
+export const hydrateProject = async (channelId: number): Promise<void> => {
+  const s = getState();
+  if (s.projectByChannel[channelId]) return;
+  if (s.channels.find((c) => c.id === channelId)?.kind !== "project") return;
+  const project = await getChannelProject(channelId);
+  if (project) setState((cur) => ({ ...cur, projectByChannel: { ...cur.projectByChannel, [channelId]: project } }));
+};
+export const setChannelProject = (channelId: number, patch: ChannelProjectPatch): Promise<ChannelProject> =>
+  invoke("project:set", { channelId, patch });
 
 export const saveSkill = (input: { name: string; description?: string; steps: string }): Promise<unknown> =>
   invoke("skills:save", input);

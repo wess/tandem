@@ -1776,3 +1776,264 @@ select {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
+
+/* ----- Project panel (chat header badge, M5.1) ----- */
+.projpanel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+.projstatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.projdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--text-faint);
+}
+.projstatus.islinked {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.projstatus.islinked .projdot {
+  background: var(--accent);
+}
+.projstatus.isdeploying {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.projstatus.isdeploying .projdot {
+  background: var(--warn);
+  animation: projpulse 1.2s ease-in-out infinite;
+}
+.projstatus.islive {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 45%, transparent);
+}
+.projstatus.islive .projdot {
+  background: var(--good);
+}
+.projstatus.iserror {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+.projstatus.iserror .projdot {
+  background: var(--bad);
+}
+@keyframes projpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.projitem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.projitem .icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+a.projrepo {
+  color: var(--text-dim);
+}
+a.projrepo:hover {
+  color: var(--text);
+}
+.projsha {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* ----- Inline channel cards (team suggestion + approval prompt) ----- */
+.suggestcard,
+.approvalcard {
+  margin: 0 16px 12px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.approvals {
+  display: flex;
+  flex-direction: column;
+}
+.suggesthead {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.suggestkicker,
+.approvalkicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+.approvalkicker {
+  color: var(--warn);
+}
+.suggestname {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 14px;
+}
+.suggestrationale {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.suggestmembers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.suggestmembers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.suggestavatar {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.suggestwho {
+  flex: 1;
+  min-width: 0;
+}
+.suggestwho b {
+  color: var(--text);
+  font-size: 13px;
+}
+.suggesthandle {
+  color: var(--text-faint);
+  font-weight: 500;
+  font-size: 12px;
+  margin-left: 4px;
+}
+.suggestrole {
+  display: block;
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: 1px;
+}
+.suggestbadges {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.suggestbadge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+}
+.suggestbadge.lead {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+}
+.suggestbadge.reuse {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 50%, transparent);
+}
+.suggestbadge.fresh {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.suggestfoot,
+.approvalfoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.suggestfoot .ghost,
+.approvalfoot .ghost {
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.suggestfoot .ghost:hover,
+.approvalfoot .ghost:hover {
+  color: var(--text);
+}
+.approvalfoot .ghost.danger {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+.approvalfoot .ghost.danger:hover {
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+}
+.suggestfoot .primary,
+.approvalfoot .primary {
+  padding: 9px 16px;
+}
+.approvalhead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.approvaltool {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.approvalargs {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow-y: auto;
+}

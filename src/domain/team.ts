@@ -2,9 +2,13 @@
 // The LLM is given the user's EXISTING agents so it reuses them instead of
 // always minting new ones, and only proposes new agents for missing roles.
 import type { Message as AiMessage } from "@atlas/ai";
-import type { Agent, Channel, ProviderKind, SuggestedMember, TeamSuggestion } from "../shared/types.ts";
+import type { ChannelRow, MessageRow } from "../db/schema.ts";
+import { MENTION_RE } from "../shared/mentions.ts";
+import type { Agent, Channel, ProviderKind, SuggestedMember, TeamSuggested, TeamSuggestion } from "../shared/types.ts";
 import { getAgentById, insertAgent, listAgents, uniqueHandle } from "./agents.ts";
-import { addMemberRow, createProjectRow, setHeadAgent, toChannel } from "./channels.ts";
+import { addMemberRow, createProjectRow, listMembers, setHeadAgent, toChannel } from "./channels.ts";
+import { listMessageRows } from "./messages.ts";
+import { ensureChannelProject } from "./projects.ts";
 import { PROVIDER_CATALOG, TIERS } from "./providers/catalog.ts";
 import { buildProvider, modelFor, providerConfigs } from "./providers/index.ts";
 
@@ -61,7 +65,9 @@ export const suggestTeam = async (ownerId: number, goal: string): Promise<TeamSu
   usable.add("ollama"); // always available (local / env fallback)
 
   const roster = existing.length
-    ? existing.map((a) => `- @${a.handle} (${a.name}) — ${a.blurb || "no description"} [${a.providerKind}/${a.model}]`).join("\n")
+    ? existing
+        .map((a) => `- @${a.handle} (${a.name}) — ${a.blurb || "no description"} [${a.providerKind}/${a.model}]`)
+        .join("\n")
     : "(none yet)";
   const providerLines = cfgs
     .filter((c) => usable.has(c.kind))
@@ -97,12 +103,19 @@ const normalize = async (
     const reuseExisting = Boolean(m.reuse) && typeof m.handle === "string" && byHandle.has(m.handle);
     if (reuseExisting) {
       const a = byHandle.get(m.handle as string)!;
-      members.push({ reuse: true, lead: Boolean(m.lead), handle: a.handle, name: a.name, role: m.role?.trim() || a.blurb || a.name });
+      members.push({
+        reuse: true,
+        lead: Boolean(m.lead),
+        handle: a.handle,
+        name: a.name,
+        role: m.role?.trim() || a.blurb || a.name,
+      });
       continue;
     }
     // New agent — fill safe defaults and coerce provider to one that's usable.
     const providerKind = m.providerKind && usable.has(m.providerKind) ? m.providerKind : fallbackKind(usable);
-    const model = m.model?.trim() || (await modelFor(ownerId, providerKind)) || PROVIDER_CATALOG[providerKind].defaultModel;
+    const model =
+      m.model?.trim() || (await modelFor(ownerId, providerKind)) || PROVIDER_CATALOG[providerKind].defaultModel;
     const name = m.name?.trim() || m.handle?.trim() || "Agent";
     members.push({
       reuse: false,
@@ -115,7 +128,8 @@ const normalize = async (
       color: m.color?.trim() || "#6366f1",
       providerKind,
       model,
-      systemPrompt: m.systemPrompt?.trim() || `You are ${name}. ${m.role?.trim() || "Help the team accomplish its goal."}`,
+      systemPrompt:
+        m.systemPrompt?.trim() || `You are ${name}. ${m.role?.trim() || "Help the team accomplish its goal."}`,
     });
   }
 
@@ -127,7 +141,12 @@ const normalize = async (
   });
 
   return {
-    name: (parsed.name?.trim() || "team").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "team",
+    name:
+      (parsed.name?.trim() || "team")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "team",
     topic: parsed.topic?.trim() || "",
     rationale: parsed.rationale?.trim() || "",
     members,
@@ -174,5 +193,52 @@ export const createTeam = async (ownerId: number, suggestion: TeamSuggestion): P
   let channelRow = ch;
   if (leadId != null) channelRow = (await setHeadAgent(ownerId, ch.id, leadId)) ?? ch;
 
+  // M5.1 — seed the empty channel↔artifact project-state link so the new project
+  // channel starts with an "unlinked" row ready for project:set.
+  await ensureChannelProject(ownerId, ch.id);
+
   return { channel: toChannel(channelRow), newAgents, members };
+};
+
+// A goal is "substantive" enough to auto-propose a team only if, once @mentions
+// are stripped, there's real intent left. A bare ping or one-word fragment isn't
+// worth a (paid) suggestion call.
+const MIN_GOAL_LEN = 12;
+const isSubstantiveGoal = (content: string): boolean => {
+  const text = content.replace(MENTION_RE, "").trim();
+  return text.length >= MIN_GOAL_LEN && /\s/.test(text);
+};
+
+// M1.5 — agent-triggered team suggest. When the FIRST substantive human message
+// lands in an agentless, non-dm channel, propose a team for it so the user can
+// accept without opening the create-project flow. Returns the broadcast payload,
+// or null when the channel isn't a fresh canvas (has members, is a dm, already
+// has prior messages, or the goal is too thin). Pure of sockets — the caller
+// (handler) broadcasts the result on the bus.
+export const maybeSuggestTeamForGoal = async (
+  ownerId: number,
+  channel: ChannelRow,
+  message: MessageRow,
+): Promise<TeamSuggested | null> => {
+  if (message.author_type !== "human" || channel.kind === "dm") return null;
+  if (!isSubstantiveGoal(message.content)) return null;
+
+  // Only fire on a genuinely empty channel: no agent members and no message
+  // other than the one we just inserted (so a later message in an emptied
+  // channel doesn't re-trigger).
+  const members = await listMembers(ownerId, channel.id);
+  if (members.length > 0) return null;
+  const rows = await listMessageRows(ownerId, channel.id);
+  const priorReal = rows.filter((m) => m.id !== message.id && m.author_type !== "system" && m.content.trim() !== "");
+  if (priorReal.length > 0) return null;
+
+  const goal = message.content.replace(MENTION_RE, "").trim();
+  try {
+    const suggestion = await suggestTeam(ownerId, goal);
+    return { channelId: channel.id, goal, suggestion };
+  } catch {
+    // A failed suggestion (provider down, bad JSON) must not break sending the
+    // message; the user simply sees no auto-prompt.
+    return null;
+  }
 };

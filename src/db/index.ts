@@ -4,7 +4,19 @@ import { config } from "../config.ts";
 export const db = connect({ driver: "postgres", url: config.databaseUrl, pool: config.dbPoolSize });
 
 export { from, raw } from "@atlas/db";
-export { agents, channels, members, memories, messages, schedules, settings, skills, usagelog, users } from "./schema.ts";
+export {
+  agents,
+  channelprojects,
+  channels,
+  members,
+  memories,
+  messages,
+  schedules,
+  settings,
+  skills,
+  usagelog,
+  users,
+} from "./schema.ts";
 
 // timestamptz comes back as Date; wire types use ISO strings. bigint → number.
 export const iso = (v: Date | string | null | undefined): string => (v instanceof Date ? v.toISOString() : (v ?? ""));
