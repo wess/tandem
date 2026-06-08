@@ -1,5 +1,14 @@
 import { useSyncExternalStore } from "react";
-import type { Agent, AgentTemplate, Channel, Message, ProviderConfig } from "../../shared/types.ts";
+import type {
+  Agent,
+  AgentTemplate,
+  ApprovalRequested,
+  Channel,
+  ChannelProject,
+  Message,
+  ProviderConfig,
+  TeamSuggested,
+} from "../../shared/types.ts";
 
 export type Modal =
   | { kind: "addAgent" }
@@ -22,6 +31,18 @@ export type State = {
   messagesByChannel: Record<number, Message[]>;
   membersByChannel: Record<number, Agent[]>;
   typingByChannel: Record<number, number[]>;
+  // Server-proposed teams, keyed by the channel the goal was typed in. Set when a
+  // "team:suggested" event arrives; cleared on accept/dismiss. A channel view can
+  // render an accept prompt off this. (M1.5)
+  teamSuggestionByChannel: Record<number, TeamSuggested>;
+  // The channel↔artifact project-state link, keyed by channel. Hydrated by
+  // project:get and kept current by "project:updated" events. (M5.1)
+  projectByChannel: Record<number, ChannelProject>;
+  // Destructive MCP tool calls parked pending human approval, keyed by channel
+  // then by approvalId. Set when an "approval:requested" event arrives; cleared
+  // on approve/deny. A channel view can render an approve/deny prompt off this.
+  // (Task #15)
+  approvalsByChannel: Record<number, Record<string, ApprovalRequested>>;
   modal: Modal | null;
   sidebarOpen: boolean;
   membersOpen: boolean;
@@ -37,6 +58,9 @@ const initial: State = {
   messagesByChannel: {},
   membersByChannel: {},
   typingByChannel: {},
+  teamSuggestionByChannel: {},
+  projectByChannel: {},
+  approvalsByChannel: {},
   modal: null,
   sidebarOpen: false,
   membersOpen: false,
@@ -59,14 +83,10 @@ const subscribe = (l: () => void): (() => void) => {
   };
 };
 
-export const useStore = <T>(selector: (s: State) => T): T =>
-  useSyncExternalStore(subscribe, () => selector(state));
+export const useStore = <T>(selector: (s: State) => T): T => useSyncExternalStore(subscribe, () => selector(state));
 
 // Helpers for immutable per-channel updates.
-export const patchChannelMessages = (
-  channelId: number,
-  fn: (msgs: Message[]) => Message[],
-): void => {
+export const patchChannelMessages = (channelId: number, fn: (msgs: Message[]) => Message[]): void => {
   setState((s) => ({
     ...s,
     messagesByChannel: { ...s.messagesByChannel, [channelId]: fn(s.messagesByChannel[channelId] ?? []) },

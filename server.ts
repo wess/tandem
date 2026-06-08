@@ -1,6 +1,7 @@
 import { get, json, pipe, router } from "@atlas/server";
 import index from "./index.html";
 import { authRoutes, sessionUserId } from "./src/api/auth.ts";
+import { internalRoutes } from "./src/api/internal/index.ts";
 import { rpcRoute } from "./src/api/rpc.ts";
 import { wsHandlers } from "./src/api/ws.ts";
 import { config } from "./src/config.ts";
@@ -32,6 +33,10 @@ const apiRoutes = [
   ),
   ...authRoutes,
   ...ssoRoutes,
+  // Service-to-service inbound status hook (kettle deploy / tangle push → chat).
+  // Self-authenticated by a shared secret, NOT the session cookie; disabled
+  // (404) until INTERNAL_HOOK_SECRET is set. See src/api/internal.
+  ...internalRoutes,
   rpcRoute,
 ];
 const handleApi = router(...apiRoutes);

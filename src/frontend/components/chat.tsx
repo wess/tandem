@@ -1,6 +1,9 @@
 import { closeMembers, deleteAgent, openModal, toggleMembers, toggleSidebar } from "../state/actions.ts";
 import { useStore } from "../state/store.ts";
 import { Avatar } from "./agent/avatar.tsx";
+import { ApprovalPrompts } from "./channel/approval.tsx";
+import { ProjectPanel } from "./channel/project.tsx";
+import { TeamSuggestionCard } from "./channel/teamsuggestion.tsx";
 import { Composer } from "./composer.tsx";
 import { Icon } from "./icon.tsx";
 import { Members } from "./members.tsx";
@@ -20,7 +23,9 @@ const Welcome = () => (
 export const Chat = () => {
   const channelId = useStore((s) => s.activeChannelId);
   const channel = useStore((s) => s.channels.find((c) => c.id === channelId));
-  const dmAgent = useStore((s) => (channel?.kind === "dm" ? s.agents.find((a) => a.id === channel.agentId) : undefined));
+  const dmAgent = useStore((s) =>
+    channel?.kind === "dm" ? s.agents.find((a) => a.id === channel.agentId) : undefined,
+  );
   const ready = useStore((s) => s.ready);
   const membersOpen = useStore((s) => s.membersOpen);
 
@@ -59,6 +64,7 @@ export const Chat = () => {
           <h1>{channel.kind === "dm" ? (dmAgent?.name ?? channel.name) : channel.slug}</h1>
           {channel.topic && <span className="chattopic">{channel.topic}</span>}
         </div>
+        <ProjectPanel channelId={channelId} />
         <div className="headactions">
           {showMembers && (
             <button type="button" className="iconbtn membersbtn" title="Members" onClick={toggleMembers}>
@@ -96,6 +102,8 @@ export const Chat = () => {
       <div className="chatbody">
         <div className="threadcol">
           <MessageList channelId={channelId} />
+          <TeamSuggestionCard channelId={channelId} />
+          <ApprovalPrompts channelId={channelId} />
           <Composer />
         </div>
         {showMembers && <Members channelId={channelId} open={membersOpen} />}

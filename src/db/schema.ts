@@ -124,6 +124,25 @@ export const settings = defineSchema("settings", {
   value: column.text().default(""),
 });
 
+// M5.1 — channel↔artifact project-state link. One row per project channel,
+// binding it to its git repo + kettle deploy project + host. Uniqueness is the
+// composite (owner_id, channel_id) — enforced in the migration. The mapper
+// toChannelProject bridges these snake_case columns to the camelCase wire type.
+export const channelprojects = defineSchema("channel_projects", {
+  id: column.serial().primaryKey(),
+  owner_id: column.integer(),
+  channel_id: column.integer(),
+  repo_owner: column.text().default(""),
+  repo_name: column.text().default(""),
+  repo_url: column.text().default(""),
+  kettle_project_id: column.text().default(""),
+  deploy_host: column.text().default(""),
+  last_sha: column.text().default(""),
+  status: column.text().default("unlinked"),
+  created_at: column.timestamp(),
+  updated_at: column.timestamp(),
+});
+
 export type UserRow = RowOf<typeof users>;
 export type SettingRow = RowOf<typeof settings>;
 export type AgentRow = RowOf<typeof agents>;
@@ -134,3 +153,4 @@ export type MemoryRow = RowOf<typeof memories>;
 export type SkillRow = RowOf<typeof skills>;
 export type ScheduleRow = RowOf<typeof schedules>;
 export type UsageRow = RowOf<typeof usagelog>;
+export type ChannelProjectRow = RowOf<typeof channelprojects>;

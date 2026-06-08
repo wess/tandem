@@ -92,6 +92,37 @@ export type UsageStats = {
   byChannel: UsageBucket[];
 };
 
+// M5.1 — the live artifacts a project channel is bound to: a git repo, a kettle
+// deploy project, and the host it runs on. `status` tracks the link's lifecycle
+// ("unlinked" until a repo is attached). One per channel, scoped to the owner.
+export type ChannelProjectStatus = "unlinked" | "linked" | "deploying" | "live" | "error";
+
+export type ChannelProject = {
+  channelId: number;
+  repoOwner: string;
+  repoName: string;
+  repoUrl: string;
+  kettleProjectId: string;
+  deployHost: string;
+  lastSha: string;
+  status: ChannelProjectStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// The fields a caller may set on project:set. All optional — only the provided
+// keys are written; channelId selects the target row. Server-managed columns
+// (timestamps, owner_id) are never accepted from the wire.
+export type ChannelProjectPatch = {
+  repoOwner?: string;
+  repoName?: string;
+  repoUrl?: string;
+  kettleProjectId?: string;
+  deployHost?: string;
+  lastSha?: string;
+  status?: ChannelProjectStatus;
+};
+
 export type AuthorType = "human" | "agent" | "system";
 export type MessageStatus = "streaming" | "complete" | "error";
 
@@ -161,4 +192,25 @@ export type TeamSuggestion = {
   topic: string;
   rationale: string;
   members: SuggestedMember[];
+};
+
+// A destructive MCP tool call an agent requested that is paused pending a human
+// decision. Fired as "approval:requested" when the runtime parks the call; the
+// client renders an approve/deny prompt and resolves it via approvals:resolve.
+// `args` is the tool's arguments, surfaced so the human can see what would run.
+export type ApprovalRequested = {
+  approvalId: string;
+  channelId: number;
+  tool: string;
+  args: Record<string, unknown>;
+};
+
+// Server-originated team suggestion: fired when the first substantive human
+// message lands in an agentless channel, so the client can offer to assemble a
+// team without the user opening the create-project flow. `channelId` is the
+// channel the goal was typed in; `goal` is the message that triggered it.
+export type TeamSuggested = {
+  channelId: number;
+  goal: string;
+  suggestion: TeamSuggestion;
 };

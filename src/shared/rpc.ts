@@ -1,8 +1,11 @@
 import type {
   Agent,
   AgentKind,
+  ApprovalRequested,
   Bootstrap,
   Channel,
+  ChannelProject,
+  ChannelProjectPatch,
   Memory,
   Message,
   ProviderConfig,
@@ -10,6 +13,7 @@ import type {
   Schedule,
   SearchHit,
   Skill,
+  TeamSuggested,
   TeamSuggestion,
   UsageStats,
 } from "./types.ts";
@@ -68,6 +72,17 @@ export type RpcMap = {
   "usage:stats": { input: void; output: UsageStats };
   "team:suggest": { input: { goal: string }; output: TeamSuggestion };
   "team:create": { input: { suggestion: TeamSuggestion }; output: { channel: Channel; members: Agent[] } };
+  // M5.1 — the channel↔artifact project-state link (null until a row exists).
+  "project:get": { input: { channelId: number }; output: ChannelProject | null };
+  "project:set": { input: { channelId: number; patch: ChannelProjectPatch }; output: ChannelProject };
+  // Task #15 — resolve a parked destructive MCP tool call. On approve the server
+  // executes the held call and posts the result as a system message; on deny it
+  // posts a denial. `found` is false when the approval id is unknown (e.g. lost
+  // to a restart or already resolved).
+  "approvals:resolve": {
+    input: { approvalId: string; approve: boolean };
+    output: { approvalId: string; found: boolean };
+  };
 };
 
 export type RpcMethod = keyof RpcMap;
@@ -92,6 +107,10 @@ export type EventMap = {
   "memory:removed": { id: number };
   "skills:changed": { skills: Skill[] };
   "schedules:changed": { channelId: number };
+  "team:suggested": TeamSuggested;
+  "project:updated": ChannelProject;
+  // Task #15 — a destructive MCP tool call was parked pending human approval.
+  "approval:requested": ApprovalRequested;
 };
 
 export type EventName = keyof EventMap;
