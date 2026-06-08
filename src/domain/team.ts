@@ -89,6 +89,53 @@ export const suggestTeam = async (ownerId: number, goal: string): Promise<TeamSu
 const fallbackKind = (usable: Set<ProviderKind>): ProviderKind =>
   usable.has("ollama") ? "ollama" : ([...usable][0] ?? "ollama");
 
+// Short, distinct, friendly names so generated teammates are easy to @mention —
+// a memorable @nova beats a role-y @factchecker.
+const FRIENDLY_NAMES = [
+  "Nova",
+  "Sage",
+  "Atlas",
+  "Echo",
+  "Juno",
+  "Zephyr",
+  "Orbit",
+  "Cleo",
+  "Iris",
+  "Ember",
+  "Cosmo",
+  "Wren",
+  "Fable",
+  "Onyx",
+  "Lumen",
+  "Vesper",
+  "Pixel",
+  "Bolt",
+  "Dash",
+  "Quill",
+  "Coral",
+  "Flint",
+  "Hazel",
+  "Indigo",
+  "Kit",
+  "Lark",
+  "Pippin",
+  "Rune",
+  "Sol",
+  "Vega",
+  "Willow",
+  "Bramble",
+];
+
+// A random name not already in `taken` (case-insensitive vs existing handles/
+// names). Falls back to Agent<N> only if the whole pool is exhausted.
+const randomName = (taken: Set<string>): string => {
+  const pool = FRIENDLY_NAMES.filter((n) => !taken.has(n.toLowerCase()));
+  if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)] as string;
+  let i = 1;
+  while (taken.has(`agent${i}`)) i += 1;
+  return `Agent${i}`;
+};
+
 const normalize = async (
   ownerId: number,
   parsed: Partial<TeamSuggestion> & { members?: Partial<SuggestedMember>[] },
@@ -96,6 +143,8 @@ const normalize = async (
   usable: Set<ProviderKind>,
 ): Promise<TeamSuggestion> => {
   const byHandle = new Map(existing.map((a) => [a.handle, a]));
+  // Names/handles already in use — new teammates get a random name avoiding these.
+  const taken = new Set<string>(existing.flatMap((a) => [a.handle.toLowerCase(), a.name.toLowerCase()]));
   const raw = Array.isArray(parsed.members) ? parsed.members : [];
 
   const members: SuggestedMember[] = [];
@@ -103,6 +152,7 @@ const normalize = async (
     const reuseExisting = Boolean(m.reuse) && typeof m.handle === "string" && byHandle.has(m.handle);
     if (reuseExisting) {
       const a = byHandle.get(m.handle as string)!;
+      taken.add(a.handle.toLowerCase());
       members.push({
         reuse: true,
         lead: Boolean(m.lead),
@@ -112,15 +162,18 @@ const normalize = async (
       });
       continue;
     }
-    // New agent — fill safe defaults and coerce provider to one that's usable.
+    // New agent — give it a random friendly name (easy to @mention), and coerce
+    // the provider to one that's usable.
     const providerKind = m.providerKind && usable.has(m.providerKind) ? m.providerKind : fallbackKind(usable);
     const model =
       m.model?.trim() || (await modelFor(ownerId, providerKind)) || PROVIDER_CATALOG[providerKind].defaultModel;
-    const name = m.name?.trim() || m.handle?.trim() || "Agent";
+    const name = randomName(taken);
+    const handle = name.toLowerCase();
+    taken.add(handle);
     members.push({
       reuse: false,
       lead: Boolean(m.lead),
-      handle: (m.handle?.trim() || name).toLowerCase(),
+      handle,
       name,
       role: m.role?.trim() || "",
       blurb: m.blurb?.trim() || m.role?.trim() || "",
