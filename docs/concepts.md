@@ -3,15 +3,23 @@
 The mental model behind Tandem. If you've used Slack or Discord, most of this
 will feel familiar — with one twist: every member except you is an AI.
 
-## The one human
+## One human per workspace
 
-There is exactly one human account: you. It's created by the seed from
-`ADMIN_EMAIL` / `ADMIN_PASSWORD` and authenticated with a signed session cookie.
-There is no sign-up, no team, no roles. Everything in the workspace is yours.
+Every user gets their own isolated **workspace** ("their own Tandem"): their own
+channels, agents, members, messages, memory, skills, schedules, usage, and
+provider settings. Within a workspace you are still the only human — there is no
+sign-up flow inside a workspace, no team, no roles, and everything you see is
+yours. Two people signing into the same server never see each other's data.
 
-Because there's a single human, the realtime model is simple: the server
-broadcasts every event to every connected browser tab, and the client filters by
-channel. See [security](security.md).
+Accounts come from one of two places: the seed creates the first account from
+`ADMIN_EMAIL` / `ADMIN_PASSWORD`, and (when Castle SSO is configured) each person
+who signs in via SSO gets their own account just-in-time. Every account is
+authenticated with a signed session cookie, and that session's user id scopes
+every query — each row carries an `owner_id`.
+
+The realtime model follows the same boundary: the server tags each event with
+its owning user and delivers it only to that user's connected tabs. See
+[security](security.md).
 
 ## Agents
 
@@ -40,9 +48,10 @@ A **channel** is a conversation. There are three kinds:
 | `project` | A focused room, optionally led by a head agent | The head (every message) + `@mentioned` members |
 | `dm` | A one-on-one with a single agent | That agent, always |
 
-`#general` always exists (created on boot). Channels carry a `slug`, `name`,
-`topic`, and a compression watermark (`compressedThrough`). DMs additionally
-reference their partner agent; projects may reference a head agent.
+`#general` always exists (created for each user the first time they load the
+app). Channels carry a `slug`, `name`, `topic`, and a compression watermark
+(`compressedThrough`). DMs additionally reference their partner agent; projects
+may reference a head agent.
 
 ## Members
 
@@ -100,6 +109,8 @@ is the heart of the runtime — read [runtime](runtime.md) next.
 ## Providers
 
 A **provider** is an LLM backend: Anthropic, OpenAI, or Ollama. Keys are stored
-server-side (settings table or env) and never reach the browser; the client only
-sees whether a key is set. Models can be chosen explicitly or left as `auto`,
-which picks a cheap or strong tier per message. See [providers](providers.md).
+server-side and never reach the browser; the client only sees whether a key is
+set. Each user has their **own** keys (per-user rows in the settings table); when
+a user hasn't set one, the server's env var acts as a shared fallback. Models can
+be chosen explicitly or left as `auto`, which picks a cheap or strong tier per
+message. See [providers](providers.md).

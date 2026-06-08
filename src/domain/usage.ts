@@ -10,6 +10,7 @@ export const estimateTokens = (text: string): number => Math.ceil(text.length / 
 
 // Durable ledger so cost survives discarded directive-only turns + compression.
 export const recordUsage = async (
+  ownerId: number,
   agentId: number | null,
   channelId: number,
   model: string,
@@ -20,6 +21,7 @@ export const recordUsage = async (
   const costUsd = (promptTokens / 1e6) * price.in + (completionTokens / 1e6) * price.out;
   await db.execute(
     from(usagelog).insert({
+      owner_id: ownerId,
       agent_id: agentId,
       channel_id: channelId,
       model,
@@ -31,23 +33,28 @@ export const recordUsage = async (
   );
 };
 
-export const channelSpend = async (channelId: number, windowMs = DAY_MS): Promise<number> =>
-  (await db.all<{ s: number }>({
-    text: "SELECT COALESCE(SUM(cost_usd), 0)::float8 AS s FROM usagelog WHERE channel_id = $1 AND created_at >= $2",
-    values: [channelId, Date.now() - windowMs],
-  }))[0]?.s ?? 0;
+export const channelSpend = async (ownerId: number, channelId: number, windowMs = DAY_MS): Promise<number> =>
+  (
+    await db.all<{ s: number }>({
+      text: "SELECT COALESCE(SUM(cost_usd), 0)::float8 AS s FROM usagelog WHERE owner_id = $1 AND channel_id = $2 AND created_at >= $3",
+      values: [ownerId, channelId, Date.now() - windowMs],
+    })
+  )[0]?.s ?? 0;
 
-export const usageStats = async (): Promise<UsageStats> => {
+export const usageStats = async (ownerId: number): Promise<UsageStats> => {
   const rows = await db.all<{
     agent_id: number | null;
     channel_id: number;
     prompt_tokens: number;
     completion_tokens: number;
     cost_usd: number;
-  }>({ text: "SELECT agent_id, channel_id, prompt_tokens, completion_tokens, cost_usd FROM usagelog", values: [] });
+  }>({
+    text: "SELECT agent_id, channel_id, prompt_tokens, completion_tokens, cost_usd FROM usagelog WHERE owner_id = $1",
+    values: [ownerId],
+  });
 
-  const agentName = new Map((await listAgents()).map((a) => [a.id, a.name]));
-  const chanName = new Map((await listChannels()).map((c) => [c.id, c.kind === "dm" ? c.name : `#${c.slug}`]));
+  const agentName = new Map((await listAgents(ownerId)).map((a) => [a.id, a.name]));
+  const chanName = new Map((await listChannels(ownerId)).map((c) => [c.id, c.kind === "dm" ? c.name : `#${c.slug}`]));
   const byAgent = new Map<number, UsageBucket>();
   const byChannel = new Map<number, UsageBucket>();
   let totalCostUsd = 0;

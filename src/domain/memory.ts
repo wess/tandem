@@ -19,6 +19,7 @@ export const toMemory = (r: MemoryRow): Memory => ({
 });
 
 export type NewMemory = {
+  ownerId: number;
   scope: MemoryScope;
   channelId: number | null;
   authorId: number | null;
@@ -32,6 +33,7 @@ const expiryFor = (scope: MemoryScope): string | null =>
 
 export const addMemory = (m: NewMemory): Promise<MemoryRow> =>
   insertRow(memories, {
+    owner_id: m.ownerId,
     scope: m.scope,
     channel_id: m.scope === "channel" ? m.channelId : null,
     author_id: m.authorId,
@@ -41,18 +43,23 @@ export const addMemory = (m: NewMemory): Promise<MemoryRow> =>
     expires_at: expiryFor(m.scope),
   });
 
-export const removeMemory = (id: number): Promise<unknown> =>
-  db.execute(from(memories).where((q) => q("id").equals(id)).del());
+export const removeMemory = (ownerId: number, id: number): Promise<unknown> =>
+  db.execute(from(memories).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).del());
 
-export const setPinned = async (id: number, pinned: boolean): Promise<MemoryRow | null> => {
-  const row = await db.one<MemoryRow>(from(memories).where((q) => q("id").equals(id)));
+export const setPinned = async (ownerId: number, id: number, pinned: boolean): Promise<MemoryRow | null> => {
+  const row = await db.one<MemoryRow>(
+    from(memories).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)),
+  );
   if (!row) return null;
   // global memories must stay non-expiring — derive TTL from the row's scope.
   const expires_at = pinned ? null : expiryFor(row.scope as MemoryScope);
-  await db.execute(from(memories).where((q) => q("id").equals(id)).update({ pinned, expires_at }));
-  return db.one(from(memories).where((q) => q("id").equals(id)));
+  await db.execute(
+    from(memories).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).update({ pinned, expires_at }),
+  );
+  return db.one(from(memories).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)));
 };
 
+// Global prune across all users — expiry is independent of tenancy.
 export const pruneExpired = async (): Promise<number> => {
   const now = new Date().toISOString();
   const n =
@@ -68,26 +75,31 @@ export const pruneExpired = async (): Promise<number> => {
   return n;
 };
 
-// Global + this channel's live (non-expired) memories, oldest first.
-const liveRows = async (channelId: number, limit?: number): Promise<MemoryRow[]> => {
+// This user's global + this channel's live (non-expired) memories, oldest first.
+const liveRows = async (ownerId: number, channelId: number, limit?: number): Promise<MemoryRow[]> => {
   const now = new Date().toISOString();
-  const where = "(scope = 'global' OR channel_id = $1) AND (pinned = true OR expires_at IS NULL OR expires_at >= $2)";
+  const where =
+    "owner_id = $1 AND (scope = 'global' OR channel_id = $2) AND (pinned = true OR expires_at IS NULL OR expires_at >= $3)";
   if (limit) {
     const rows = await db.all<MemoryRow>({
-      text: `SELECT * FROM memories WHERE ${where} ORDER BY id DESC LIMIT $3`,
-      values: [channelId, now, limit],
+      text: `SELECT * FROM memories WHERE ${where} ORDER BY id DESC LIMIT $4`,
+      values: [ownerId, channelId, now, limit],
     });
     return rows.reverse();
   }
-  return db.all<MemoryRow>({ text: `SELECT * FROM memories WHERE ${where} ORDER BY id ASC`, values: [channelId, now] });
+  return db.all<MemoryRow>({
+    text: `SELECT * FROM memories WHERE ${where} ORDER BY id ASC`,
+    values: [ownerId, channelId, now],
+  });
 };
 
-export const listMemories = async (channelId: number): Promise<Memory[]> => (await liveRows(channelId)).map(toMemory);
+export const listMemories = async (ownerId: number, channelId: number): Promise<Memory[]> =>
+  (await liveRows(ownerId, channelId)).map(toMemory);
 
 const cap = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-export const memoryDigest = async (channelId: number, limit = 40): Promise<string> => {
-  const rows = await liveRows(channelId, limit);
+export const memoryDigest = async (ownerId: number, channelId: number, limit = 40): Promise<string> => {
+  const rows = await liveRows(ownerId, channelId, limit);
   if (rows.length === 0) return "";
   return rows
     .map((r) => {
@@ -98,4 +110,5 @@ export const memoryDigest = async (channelId: number, limit = 40): Promise<strin
     .join("\n");
 };
 
-export const memoryCount = async (channelId: number): Promise<number> => (await liveRows(channelId)).length;
+export const memoryCount = async (ownerId: number, channelId: number): Promise<number> =>
+  (await liveRows(ownerId, channelId)).length;

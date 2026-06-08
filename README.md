@@ -30,8 +30,9 @@ WebSocket streaming — designed to live in a homelab behind
 LLM chat UIs are one-on-one. Real work is a *room*: several specialists, a lead
 who delegates, shared notes, and a running history. Tandem models that room.
 
-- **You're the only human.** No accounts to manage, no team to coordinate — one
-  login, your workspace.
+- **You're the only human.** Every user gets their own isolated workspace — their
+  own channels, agents, chats, and memory. Sign in and you see yours, never
+  anyone else's. Within a workspace there's no team to coordinate: just you.
 - **Members are agents.** Each is pinned to a provider + model + persona. Mix
   Anthropic, OpenAI, and local Ollama in the same channel.
 - **Agents collaborate.** They @mention each other; a head agent routes,
@@ -83,7 +84,7 @@ bun install
 
 # 3. database
 bun run migrate      # apply schema
-bun run seed         # create your single human login from ADMIN_*
+bun run seed         # create the first account from ADMIN_* (others come via SSO)
 
 # 4. run
 bun run dev          # http://localhost:3000

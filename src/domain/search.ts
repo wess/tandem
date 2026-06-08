@@ -12,12 +12,12 @@ const isoT = (v: Date | string): string => (v instanceof Date ? v.toISOString() 
 const orTsquery = (raw: string): string =>
   [...new Set(raw.toLowerCase().match(/[a-z0-9]{4,}/g) ?? [])].slice(0, 6).join(" | ");
 
-export const search = async (query: string): Promise<SearchHit[]> => {
+export const search = async (ownerId: number, query: string): Promise<SearchHit[]> => {
   const q = query.trim();
   if (!q) return [];
 
-  const agents = new Map((await listAgents()).map((a) => [a.id, a.name]));
-  const channels = await listChannels();
+  const agents = new Map((await listAgents(ownerId)).map((a) => [a.id, a.name]));
+  const channels = await listChannels(ownerId);
   const label = (id: number | null): string => {
     if (id == null) return "workspace";
     const ch = channels.find((c) => c.id === id);
@@ -37,9 +37,9 @@ export const search = async (query: string): Promise<SearchHit[]> => {
     text:
       "SELECT m.id, m.channel_id, m.author_type, m.author_id, m.created_at, " +
       "ts_headline('english', m.content, plainto_tsquery('english', $1), $2) AS snip " +
-      "FROM messages m WHERE m.tsv @@ plainto_tsquery('english', $1) AND m.status = 'complete' AND m.author_type <> 'system' " +
+      "FROM messages m WHERE m.owner_id = $3 AND m.tsv @@ plainto_tsquery('english', $1) AND m.status = 'complete' AND m.author_type <> 'system' " +
       "ORDER BY ts_rank(m.tsv, plainto_tsquery('english', $1)) DESC LIMIT 30",
-    values: [q, HEADLINE],
+    values: [q, HEADLINE, ownerId],
   });
   for (const m of msgs) {
     hits.push({
@@ -63,9 +63,9 @@ export const search = async (query: string): Promise<SearchHit[]> => {
     text:
       "SELECT x.id, x.channel_id, x.author_id, x.created_at, " +
       "ts_headline('english', x.title || ' ' || x.body, plainto_tsquery('english', $1), $2) AS snip " +
-      "FROM memories x WHERE x.tsv @@ plainto_tsquery('english', $1) " +
+      "FROM memories x WHERE x.owner_id = $3 AND x.tsv @@ plainto_tsquery('english', $1) " +
       "ORDER BY ts_rank(x.tsv, plainto_tsquery('english', $1)) DESC LIMIT 15",
-    values: [q, HEADLINE],
+    values: [q, HEADLINE, ownerId],
   });
   for (const x of mems) {
     hits.push({
@@ -85,6 +85,7 @@ export const search = async (query: string): Promise<SearchHit[]> => {
 // Relevant messages between the compression watermark (afterId) and the recent
 // window (beforeId) for context injection — never resurrects compressed history.
 export const recall = async (
+  ownerId: number,
   channelId: number,
   query: string,
   beforeId: number,
@@ -93,13 +94,13 @@ export const recall = async (
 ): Promise<string[]> => {
   const tq = orTsquery(query);
   if (!tq) return [];
-  const agents = new Map((await listAgents()).map((a) => [a.id, a.name]));
+  const agents = new Map((await listAgents(ownerId)).map((a) => [a.id, a.name]));
   const rows = await db.all<{ content: string; author_type: string; author_id: number | null }>({
     text:
       "SELECT m.content, m.author_type, m.author_id FROM messages m " +
-      "WHERE m.tsv @@ to_tsquery('english', $1) AND m.channel_id = $2 AND m.id < $3 AND m.id > $4 " +
+      "WHERE m.owner_id = $6 AND m.tsv @@ to_tsquery('english', $1) AND m.channel_id = $2 AND m.id < $3 AND m.id > $4 " +
       "AND m.status = 'complete' AND m.content <> '' ORDER BY ts_rank(m.tsv, to_tsquery('english', $1)) DESC LIMIT $5",
-    values: [tq, channelId, beforeId, afterId, limit],
+    values: [tq, channelId, beforeId, afterId, limit, ownerId],
   });
   return rows.map((r) => {
     const who = r.author_type === "human" ? "Human" : (agents.get(r.author_id ?? -1) ?? "Agent");

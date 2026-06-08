@@ -16,16 +16,24 @@ export const toSchedule = (r: ScheduleRow): Schedule => ({
   createdAt: iso(r.created_at),
 });
 
-export const listSchedules = async (channelId: number): Promise<Schedule[]> =>
-  (await db.all<ScheduleRow>(from(schedules).where((q) => q("channel_id").equals(channelId)).orderBy("id", "ASC"))).map(toSchedule);
+export const listSchedules = async (ownerId: number, channelId: number): Promise<Schedule[]> =>
+  (
+    await db.all<ScheduleRow>(
+      from(schedules)
+        .where((q) => q("owner_id").equals(ownerId))
+        .where((q) => q("channel_id").equals(channelId))
+        .orderBy("id", "ASC"),
+    )
+  ).map(toSchedule);
 
-export const getSchedule = (id: number): Promise<ScheduleRow | null> =>
-  db.one(from(schedules).where((q) => q("id").equals(id)));
+export const getSchedule = (ownerId: number, id: number): Promise<ScheduleRow | null> =>
+  db.one(from(schedules).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)));
 
 export type NewSchedule = { channelId: number; agentId: number; prompt: string; intervalMinutes: number };
 
-export const createSchedule = (input: NewSchedule, now: number): Promise<ScheduleRow> =>
+export const createSchedule = (ownerId: number, input: NewSchedule, now: number): Promise<ScheduleRow> =>
   insertRow(schedules, {
+    owner_id: ownerId,
     channel_id: input.channelId,
     agent_id: input.agentId,
     prompt: input.prompt,
@@ -34,6 +42,7 @@ export const createSchedule = (input: NewSchedule, now: number): Promise<Schedul
   });
 
 export const updateSchedule = async (
+  ownerId: number,
   id: number,
   patch: { enabled?: boolean; prompt?: string; intervalMinutes?: number },
   now: number,
@@ -45,22 +54,30 @@ export const updateSchedule = async (
     clean.interval_minutes = patch.intervalMinutes;
     clean.next_run_at = now + patch.intervalMinutes * MIN_MS;
   }
-  if (Object.keys(clean).length) await db.execute(from(schedules).where((q) => q("id").equals(id)).update(clean));
-  return getSchedule(id);
+  if (Object.keys(clean).length)
+    await db.execute(from(schedules).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).update(clean));
+  return getSchedule(ownerId, id);
 };
 
-export const removeSchedule = (id: number): Promise<unknown> =>
-  db.execute(from(schedules).where((q) => q("id").equals(id)).del());
-export const removeSchedulesForAgent = (agentId: number): Promise<unknown> =>
-  db.execute(from(schedules).where((q) => q("agent_id").equals(agentId)).del());
-export const removeSchedulesForChannel = (channelId: number): Promise<unknown> =>
-  db.execute(from(schedules).where((q) => q("channel_id").equals(channelId)).del());
+export const removeSchedule = (ownerId: number, id: number): Promise<unknown> =>
+  db.execute(from(schedules).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).del());
+export const removeSchedulesForAgent = (ownerId: number, agentId: number): Promise<unknown> =>
+  db.execute(from(schedules).where((q) => q("owner_id").equals(ownerId)).where((q) => q("agent_id").equals(agentId)).del());
+export const removeSchedulesForChannel = (ownerId: number, channelId: number): Promise<unknown> =>
+  db.execute(from(schedules).where((q) => q("owner_id").equals(ownerId)).where((q) => q("channel_id").equals(channelId)).del());
 
-export const dueSchedules = async (now: number): Promise<Schedule[]> =>
-  (await db.all<ScheduleRow>({
+// Global across all users — the scheduler fans these out per owner. Returns
+// rows (with owner_id) so the scheduler can scope each run to its tenant.
+export const dueSchedules = (now: number): Promise<ScheduleRow[]> =>
+  db.all<ScheduleRow>({
     text: "SELECT * FROM schedules WHERE enabled = true AND next_run_at <= $1 ORDER BY next_run_at ASC",
     values: [now],
-  })).map(toSchedule);
+  });
 
-export const markRan = (id: number, intervalMinutes: number, now: number): Promise<unknown> =>
-  db.execute(from(schedules).where((q) => q("id").equals(id)).update({ last_run_at: now, next_run_at: now + intervalMinutes * MIN_MS }));
+export const markRan = (ownerId: number, id: number, intervalMinutes: number, now: number): Promise<unknown> =>
+  db.execute(
+    from(schedules)
+      .where((q) => q("owner_id").equals(ownerId))
+      .where((q) => q("id").equals(id))
+      .update({ last_run_at: now, next_run_at: now + intervalMinutes * MIN_MS }),
+  );

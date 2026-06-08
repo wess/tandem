@@ -2,10 +2,16 @@ import { apiKeyFor, baseUrlFor } from "./index.ts";
 
 // Image generation via OpenAI's images API. Returns a value usable directly as
 // an <img src> — a base64 data URL when the model returns b64_json, else the URL.
-export const generateImage = async (model: string, prompt: string, signal?: AbortSignal): Promise<string> => {
-  const apiKey = await apiKeyFor("openai");
+// Keyed to the owner so it uses that user's OpenAI key (or the env fallback).
+export const generateImage = async (
+  ownerId: number,
+  model: string,
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<string> => {
+  const apiKey = await apiKeyFor(ownerId, "openai");
   if (!apiKey) throw new Error("No OpenAI API key set. Add one in Settings.");
-  const base = (await baseUrlFor("openai")) || "https://api.openai.com/v1";
+  const base = (await baseUrlFor(ownerId, "openai")) || "https://api.openai.com/v1";
 
   const res = await fetch(`${base}/images/generations`, {
     method: "POST",

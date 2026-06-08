@@ -37,13 +37,15 @@ Related guards defined near their use:
 
 ## Provider keys: env vs. settings
 
-Keys can come from either the environment or the `settings` table (set in the
-Settings UI). Resolution is **settings table → environment variable**. This means:
+Keys can come from either the environment or the `settings` table. Settings rows
+are **per user** (each user sets their own in their Settings UI), and resolution
+is **the user's settings row → environment variable**. This means:
 
-- For a quick local run, put keys in `.env`.
-- For a deployed instance, prefer setting them in the UI so they live in the
-  database with the rest of your workspace — and so you can rotate them without a
-  redeploy.
+- The env keys here act as a **shared fallback** for everyone — handy for a quick
+  local run, or so a fresh user's agents work immediately on a host budget.
+- A user who sets their own key in the UI overrides the fallback for their
+  workspace only, and can rotate it without a redeploy.
+- Leave the env keys empty if you want every user to bring their own.
 
 Either way, keys stay server-side and never reach the browser
 ([security](security.md)).

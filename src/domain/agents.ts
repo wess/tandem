@@ -18,24 +18,25 @@ export const toAgent = (r: AgentRow): Agent => ({
   createdAt: iso(r.created_at),
 });
 
-export const listAgents = async (): Promise<Agent[]> => (await db.all(from(agents).orderBy("id", "ASC"))).map(toAgent);
+export const listAgents = async (ownerId: number): Promise<Agent[]> =>
+  (await db.all(from(agents).where((q) => q("owner_id").equals(ownerId)).orderBy("id", "ASC"))).map(toAgent);
 
-export const getAgentRow = (id: number): Promise<AgentRow | null> =>
-  db.one(from(agents).where((q) => q("id").equals(id)));
+export const getAgentRow = (ownerId: number, id: number): Promise<AgentRow | null> =>
+  db.one(from(agents).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)));
 
-export const getAgentById = async (id: number): Promise<Agent | undefined> => {
-  const row = await getAgentRow(id);
+export const getAgentById = async (ownerId: number, id: number): Promise<Agent | undefined> => {
+  const row = await getAgentRow(ownerId, id);
   return row ? toAgent(row) : undefined;
 };
 
-const getAgentRowByHandle = (handle: string): Promise<AgentRow | null> =>
-  db.one(from(agents).where((q) => q("handle").equals(handle)));
+const getAgentRowByHandle = (ownerId: number, handle: string): Promise<AgentRow | null> =>
+  db.one(from(agents).where((q) => q("owner_id").equals(ownerId)).where((q) => q("handle").equals(handle)));
 
-export const uniqueHandle = async (base: string): Promise<string> => {
+export const uniqueHandle = async (ownerId: number, base: string): Promise<string> => {
   const slug = slugifyHandle(base) || "agent";
-  if (!(await getAgentRowByHandle(slug))) return slug;
+  if (!(await getAgentRowByHandle(ownerId, slug))) return slug;
   let i = 2;
-  while (await getAgentRowByHandle(`${slug}${i}`)) i += 1;
+  while (await getAgentRowByHandle(ownerId, `${slug}${i}`)) i += 1;
   return `${slug}${i}`;
 };
 
@@ -52,8 +53,9 @@ export type NewAgent = {
   parentId?: number | null;
 };
 
-export const insertAgent = (input: NewAgent): Promise<AgentRow> =>
+export const insertAgent = (ownerId: number, input: NewAgent): Promise<AgentRow> =>
   insertRow(agents, {
+    owner_id: ownerId,
     handle: input.handle,
     name: input.name,
     blurb: input.blurb,
@@ -67,8 +69,8 @@ export const insertAgent = (input: NewAgent): Promise<AgentRow> =>
   });
 
 // patch keys are DB column names (e.g. { name }, { avatar }).
-export const updateAgent = (id: number, patch: Record<string, unknown>): Promise<unknown> =>
-  db.execute(from(agents).where((q) => q("id").equals(id)).update(patch));
+export const updateAgent = (ownerId: number, id: number, patch: Record<string, unknown>): Promise<unknown> =>
+  db.execute(from(agents).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).update(patch));
 
-export const deleteAgentRow = (id: number): Promise<unknown> =>
-  db.execute(from(agents).where((q) => q("id").equals(id)).del());
+export const deleteAgentRow = (ownerId: number, id: number): Promise<unknown> =>
+  db.execute(from(agents).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).del());

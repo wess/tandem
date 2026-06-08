@@ -61,15 +61,19 @@ methods return `404`; unauthenticated calls return `401`. On the client this is
 | `schedules:delete` | `{ id }` | `{ id }` |
 | `usage:stats` | — | `UsageStats` |
 
-`bootstrap` is the single call that hydrates the app on load: channels, agents,
-provider configs, and the agent templates.
+`bootstrap` is the single call that hydrates the app on load: the caller's
+channels, agents, provider configs, and the agent templates. Every method is
+scoped to the authenticated user — the session cookie supplies an `owner_id` that
+filters every read and stamps every write, so an id belonging to another user
+resolves to "not found".
 
 ## WebSocket events
 
-Connect to `/ws` (the upgrade is gated on the session cookie). The server
-broadcasts `{ event, data }` frames to every connected client; the client
-subscribes by name with `on("event", handler)` and filters by `channelId` where
-relevant. Because there's one human, every tab receives every event.
+Connect to `/ws` (the upgrade is gated on the session cookie, which also tags the
+socket with its user). The server delivers `{ event, data }` frames only to the
+sockets of the user who owns the event; the client subscribes by name with
+`on("event", handler)` and filters by `channelId` where relevant. A user's own
+tabs all receive that user's events — never another user's.
 
 ### Events (`EventMap`)
 

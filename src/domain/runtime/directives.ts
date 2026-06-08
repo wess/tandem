@@ -11,8 +11,9 @@ const MAX_SPAWNS_PER_TURN = 4;
 const titleCase = (s: string): string => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 const spawnSubagent = async (head: Agent, channel: ChannelRow, handle: string, role: string): Promise<Agent> => {
-  const assigned = await uniqueHandle(handle || "agent");
-  const row = await insertAgent({
+  const owner = channel.owner_id;
+  const assigned = await uniqueHandle(owner, handle || "agent");
+  const row = await insertAgent(owner, {
     handle: assigned,
     name: titleCase(assigned),
     blurb: role.slice(0, 80),
@@ -24,11 +25,11 @@ const spawnSubagent = async (head: Agent, channel: ChannelRow, handle: string, r
     kind: "chat",
     parentId: head.id,
   });
-  const sub = await getAgentById(row.id);
-  if (sub) broadcast("agent:created", sub);
-  await addMemberRow(channel.id, row.id);
-  broadcast("members:changed", { channelId: channel.id, members: await listMembers(channel.id) });
-  return sub ?? ((await getAgentById(row.id)) as Agent);
+  const sub = await getAgentById(owner, row.id);
+  if (sub) broadcast("agent:created", sub, owner);
+  await addMemberRow(owner, channel.id, row.id);
+  broadcast("members:changed", { channelId: channel.id, members: await listMembers(owner, channel.id) }, owner);
+  return sub ?? ((await getAgentById(owner, row.id)) as Agent);
 };
 
 // Apply an agent's reply directives. Returns the reply with directive lines
@@ -39,6 +40,7 @@ export const processDirectives = async (
   channel: ChannelRow,
   content: string,
 ): Promise<{ clean: string; notes: string[]; spawnedIds: number[] }> => {
+  const owner = channel.owner_id;
   const { clean, directives } = parseDirectives(content);
   const notes: string[] = [];
   const spawnedIds: number[] = [];
@@ -46,18 +48,18 @@ export const processDirectives = async (
 
   for (const d of directives) {
     if (d.kind === "rename" && d.value) {
-      await updateAgent(agent.id, { name: d.value });
-      const u = await getAgentById(agent.id);
-      if (u) broadcast("agent:updated", u);
+      await updateAgent(owner, agent.id, { name: d.value });
+      const u = await getAgentById(owner, agent.id);
+      if (u) broadcast("agent:updated", u, owner);
       notes.push(`${agent.name} is now “${d.value}”`);
       agent = { ...agent, name: d.value };
     } else if (d.kind === "avatar" && d.value) {
-      await updateAgent(agent.id, { avatar: d.value });
-      const u = await getAgentById(agent.id);
-      if (u) broadcast("agent:updated", u);
+      await updateAgent(owner, agent.id, { avatar: d.value });
+      const u = await getAgentById(owner, agent.id);
+      if (u) broadcast("agent:updated", u, owner);
     } else if (d.kind === "memory" && d.title) {
-      const row = await addMemory({ scope: d.scope, channelId: channel.id, authorId: agent.id, title: d.title, body: d.body });
-      broadcast("memory:added", toMemory(row));
+      const row = await addMemory({ ownerId: owner, scope: d.scope, channelId: channel.id, authorId: agent.id, title: d.title, body: d.body });
+      broadcast("memory:added", toMemory(row), owner);
       notes.push(`${agent.name} noted ${d.scope === "global" ? "(shared) " : ""}“${d.title}”`);
     } else if (d.kind === "spawn" && d.handle && channel.head_agent_id === agent.id) {
       const key = d.handle.toLowerCase();
@@ -67,8 +69,8 @@ export const processDirectives = async (
       spawnedIds.push(sub.id);
       notes.push(`${agent.name} brought in @${sub.handle}`);
     } else if (d.kind === "skill" && d.name && d.steps) {
-      const sk = await saveSkill({ name: d.name, steps: d.steps, authorId: agent.id });
-      broadcast("skills:changed", { skills: await listSkills() });
+      const sk = await saveSkill({ ownerId: owner, name: d.name, steps: d.steps, authorId: agent.id });
+      broadcast("skills:changed", { skills: await listSkills(owner) }, owner);
       notes.push(`${agent.name} saved skill “${sk.name}”`);
     }
   }

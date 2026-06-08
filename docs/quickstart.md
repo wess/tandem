@@ -19,7 +19,8 @@ cp .env.example .env
 Edit `.env`:
 
 - `AUTH_SECRET` — a long random string used to sign session cookies. Change it.
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` — your single human login, created by the seed.
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD` — the first account's login, created by the
+  seed. Additional users get their own isolated workspace on first SSO login.
 - `DATABASE_URL` — your Postgres connection string.
 - One or more of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OLLAMA_URL`.
 

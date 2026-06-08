@@ -16,78 +16,116 @@ export const toChannel = (r: ChannelRow): Channel => ({
   createdAt: iso(r.created_at),
 });
 
-export const getChannel = (id: number): Promise<ChannelRow | null> =>
-  db.one(from(channels).where((q) => q("id").equals(id)));
+export const getChannel = (ownerId: number, id: number): Promise<ChannelRow | null> =>
+  db.one(from(channels).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)));
 
-export const listChannels = async (): Promise<Channel[]> =>
-  (await db.all<ChannelRow>(from(channels).orderBy("id", "ASC"))).map(toChannel);
+export const listChannels = async (ownerId: number): Promise<Channel[]> =>
+  (await db.all<ChannelRow>(from(channels).where((q) => q("owner_id").equals(ownerId)).orderBy("id", "ASC"))).map(toChannel);
 
-export const setHeadAgent = async (channelId: number, agentId: number | null): Promise<ChannelRow | null> => {
-  await db.execute(from(channels).where((q) => q("id").equals(channelId)).update({ head_agent_id: agentId }));
-  return getChannel(channelId);
+export const setHeadAgent = async (ownerId: number, channelId: number, agentId: number | null): Promise<ChannelRow | null> => {
+  await db.execute(
+    from(channels).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(channelId)).update({ head_agent_id: agentId }),
+  );
+  return getChannel(ownerId, channelId);
 };
 
-export const channelsHeadedBy = (agentId: number): Promise<ChannelRow[]> =>
-  db.all(from(channels).where((q) => q("head_agent_id").equals(agentId)));
+export const channelsHeadedBy = (ownerId: number, agentId: number): Promise<ChannelRow[]> =>
+  db.all(from(channels).where((q) => q("owner_id").equals(ownerId)).where((q) => q("head_agent_id").equals(agentId)));
 
-export const dmChannelsForAgent = (agentId: number): Promise<ChannelRow[]> =>
-  db.all(from(channels).where((q) => q("kind").equals("dm")).where((q) => q("agent_id").equals(agentId)));
+export const dmChannelsForAgent = (ownerId: number, agentId: number): Promise<ChannelRow[]> =>
+  db.all(
+    from(channels)
+      .where((q) => q("owner_id").equals(ownerId))
+      .where((q) => q("kind").equals("dm"))
+      .where((q) => q("agent_id").equals(agentId)),
+  );
 
-export const removeChannel = async (id: number): Promise<void> => {
-  await db.execute(from(members).where((q) => q("channel_id").equals(id)).del());
-  await db.execute(from(schedules).where((q) => q("channel_id").equals(id)).del());
-  await db.execute(from(channels).where((q) => q("id").equals(id)).del());
+export const removeChannel = async (ownerId: number, id: number): Promise<void> => {
+  await db.execute(from(members).where((q) => q("owner_id").equals(ownerId)).where((q) => q("channel_id").equals(id)).del());
+  await db.execute(from(schedules).where((q) => q("owner_id").equals(ownerId)).where((q) => q("channel_id").equals(id)).del());
+  await db.execute(from(channels).where((q) => q("owner_id").equals(ownerId)).where((q) => q("id").equals(id)).del());
 };
 
-export const removeMembershipsForAgent = (agentId: number): Promise<unknown> =>
-  db.execute(from(members).where((q) => q("agent_id").equals(agentId)).del());
+export const removeMembershipsForAgent = (ownerId: number, agentId: number): Promise<unknown> =>
+  db.execute(from(members).where((q) => q("owner_id").equals(ownerId)).where((q) => q("agent_id").equals(agentId)).del());
 
-const slugTaken = async (slug: string): Promise<boolean> =>
-  Boolean(await db.one(from(channels).where((q) => q("slug").equals(slug))));
+const slugTaken = async (ownerId: number, slug: string): Promise<boolean> =>
+  Boolean(await db.one(from(channels).where((q) => q("owner_id").equals(ownerId)).where((q) => q("slug").equals(slug))));
 
-const uniqueSlug = async (base: string): Promise<string> => {
+const uniqueSlug = async (ownerId: number, base: string): Promise<string> => {
   const slug = base || "channel";
-  if (!(await slugTaken(slug))) return slug;
+  if (!(await slugTaken(ownerId, slug))) return slug;
   let i = 2;
-  while (await slugTaken(`${slug}${i}`)) i += 1;
+  while (await slugTaken(ownerId, `${slug}${i}`)) i += 1;
   return `${slug}${i}`;
 };
 
-export const ensureGeneral = async (): Promise<ChannelRow> => {
-  const existing = await db.one<ChannelRow>(from(channels).where((q) => q("slug").equals("general")));
-  if (existing) return existing;
-  return insertRow(channels, { slug: "general", name: "general", kind: "channel", topic: "Everyone starts here." });
-};
-
-export const createProjectRow = async (name: string, topic: string): Promise<ChannelRow> => {
-  const slug = await uniqueSlug(slugifyHandle(name));
-  return insertRow(channels, { slug, name, kind: "project", topic });
-};
-
-export const openDmRow = async (agentId: number): Promise<ChannelRow> => {
+// Every user gets their own #general the first time they bootstrap.
+export const ensureGeneral = async (ownerId: number): Promise<ChannelRow> => {
   const existing = await db.one<ChannelRow>(
-    from(channels).where((q) => q("kind").equals("dm")).where((q) => q("agent_id").equals(agentId)),
+    from(channels).where((q) => q("owner_id").equals(ownerId)).where((q) => q("slug").equals("general")),
   );
   if (existing) return existing;
-  const agent = await getAgentById(agentId);
-  const slug = await uniqueSlug(`dm${slugifyHandle(agent?.handle ?? String(agentId))}`);
-  return insertRow(channels, { slug, name: agent?.name ?? "Direct message", kind: "dm", topic: "", agent_id: agentId });
+  return insertRow(channels, {
+    owner_id: ownerId,
+    slug: "general",
+    name: "general",
+    kind: "channel",
+    topic: "Everyone starts here.",
+  });
 };
 
-export const listMembers = async (channelId: number): Promise<Agent[]> => {
+export const createProjectRow = async (ownerId: number, name: string, topic: string): Promise<ChannelRow> => {
+  const slug = await uniqueSlug(ownerId, slugifyHandle(name));
+  return insertRow(channels, { owner_id: ownerId, slug, name, kind: "project", topic });
+};
+
+export const openDmRow = async (ownerId: number, agentId: number): Promise<ChannelRow> => {
+  const existing = await db.one<ChannelRow>(
+    from(channels)
+      .where((q) => q("owner_id").equals(ownerId))
+      .where((q) => q("kind").equals("dm"))
+      .where((q) => q("agent_id").equals(agentId)),
+  );
+  if (existing) return existing;
+  const agent = await getAgentById(ownerId, agentId);
+  const slug = await uniqueSlug(ownerId, `dm${slugifyHandle(agent?.handle ?? String(agentId))}`);
+  return insertRow(channels, {
+    owner_id: ownerId,
+    slug,
+    name: agent?.name ?? "Direct message",
+    kind: "dm",
+    topic: "",
+    agent_id: agentId,
+  });
+};
+
+export const listMembers = async (ownerId: number, channelId: number): Promise<Agent[]> => {
   const rows = await db.all<{ agent_id: number }>(
-    from(members).where((q) => q("channel_id").equals(channelId)).select("agent_id"),
+    from(members)
+      .where((q) => q("owner_id").equals(ownerId))
+      .where((q) => q("channel_id").equals(channelId))
+      .select("agent_id"),
   );
   const ids = new Set(rows.map((r) => r.agent_id));
-  return (await listAgents()).filter((a) => ids.has(a.id));
+  return (await listAgents(ownerId)).filter((a) => ids.has(a.id));
 };
 
-export const addMemberRow = async (channelId: number, agentId: number): Promise<void> => {
+export const addMemberRow = async (ownerId: number, channelId: number, agentId: number): Promise<void> => {
   const exists = await db.one(
-    from(members).where((q) => q("channel_id").equals(channelId)).where((q) => q("agent_id").equals(agentId)),
+    from(members)
+      .where((q) => q("owner_id").equals(ownerId))
+      .where((q) => q("channel_id").equals(channelId))
+      .where((q) => q("agent_id").equals(agentId)),
   );
-  if (!exists) await db.execute(from(members).insert({ channel_id: channelId, agent_id: agentId }));
+  if (!exists) await db.execute(from(members).insert({ owner_id: ownerId, channel_id: channelId, agent_id: agentId }));
 };
 
-export const removeMemberRow = (channelId: number, agentId: number): Promise<unknown> =>
-  db.execute(from(members).where((q) => q("channel_id").equals(channelId)).where((q) => q("agent_id").equals(agentId)).del());
+export const removeMemberRow = (ownerId: number, channelId: number, agentId: number): Promise<unknown> =>
+  db.execute(
+    from(members)
+      .where((q) => q("owner_id").equals(ownerId))
+      .where((q) => q("channel_id").equals(channelId))
+      .where((q) => q("agent_id").equals(agentId))
+      .del(),
+  );

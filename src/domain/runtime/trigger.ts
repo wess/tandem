@@ -15,10 +15,10 @@ export const candidatesFor = async (
 ): Promise<{ channel: ChannelRow; agents: Agent[] } | null> => {
   if (message.author_type === "system") return null;
 
-  const channel = await getChannel(message.channel_id);
+  const channel = await getChannel(message.owner_id, message.channel_id);
   if (!channel) return null;
 
-  const members = await listMembers(channel.id);
+  const members = await listMembers(channel.owner_id, channel.id);
   const isSelf = (a: Agent): boolean => message.author_type === "agent" && message.author_id === a.id;
   const mentioned = new Set(parseMentions(message.content));
   const byMention = members.filter((a) => mentioned.has(a.handle) && !isSelf(a));

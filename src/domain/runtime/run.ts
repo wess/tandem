@@ -53,7 +53,7 @@ const resolveModel = async (agent: Agent, channel: ChannelRow, rows: MessageRow[
   const tier = TIERS[agent.providerKind];
   const prompt = lastIncoming(rows, agent);
   const complex = prompt.length > 280 || COMPLEX.test(prompt);
-  const overBudget = (await channelSpend(channel.id)) > CHANNEL_BUDGET_USD;
+  const overBudget = (await channelSpend(channel.owner_id, channel.id)) > CHANNEL_BUDGET_USD;
   return complex && !overBudget ? tier.strong : tier.cheap;
 };
 
@@ -63,10 +63,10 @@ const buildSystem = async (rows: MessageRow[], channel: ChannelRow, agent: Agent
   const roster = members.filter((a) => a.id !== agent.id).map((a) => `@${a.handle} (${a.name})`).join(", ");
   const place = channel.kind === "dm" ? "a private direct message" : `the #${channel.slug} ${channel.kind}`;
   const [digest, skills, recalled, memCount] = await Promise.all([
-    memoryDigest(channel.id),
-    skillsDigest(),
-    recall(channel.id, lastIncoming(rows, agent), earliestId, 4, channel.compressed_through),
-    memoryCount(channel.id),
+    memoryDigest(channel.owner_id, channel.id),
+    skillsDigest(channel.owner_id),
+    recall(channel.owner_id, channel.id, lastIncoming(rows, agent), earliestId, 4, channel.compressed_through),
+    memoryCount(channel.owner_id, channel.id),
   ]);
 
   const lines = [
@@ -99,8 +99,8 @@ const buildSystem = async (rows: MessageRow[], channel: ChannelRow, agent: Agent
   return lines.filter(Boolean).join("\n");
 };
 
-const lastHumanPrompt = async (channelId: number): Promise<string> => {
-  const humans = (await listMessageRows(channelId)).filter((m) => m.author_type === "human");
+const lastHumanPrompt = async (ownerId: number, channelId: number): Promise<string> => {
+  const humans = (await listMessageRows(ownerId, channelId)).filter((m) => m.author_type === "human");
   const text = humans[humans.length - 1]?.content ?? "";
   return text.replace(MENTION_RE, "").trim() || "an evocative abstract artwork";
 };
@@ -113,14 +113,16 @@ const reason = (err: unknown): string => {
 export type TurnResult = { message: MessageRow | null; spawnedIds: number[] };
 
 export const runAgentTurn = async (channel: ChannelRow, agent: Agent): Promise<TurnResult> => {
+  const owner = channel.owner_id;
   const placeholder = await insertMessage({
+    ownerId: owner,
     channelId: channel.id,
     authorType: "agent",
     authorId: agent.id,
     status: "streaming",
   });
-  broadcast("message:created", toMessage(placeholder));
-  broadcast("agent:typing", { channelId: channel.id, agentId: agent.id, active: true });
+  broadcast("message:created", toMessage(placeholder), owner);
+  broadcast("agent:typing", { channelId: channel.id, agentId: agent.id, active: true }, owner);
 
   const controller = new AbortController();
   register(channel.id, controller);
@@ -130,47 +132,47 @@ export const runAgentTurn = async (channel: ChannelRow, agent: Agent): Promise<T
 
   const discard = async (): Promise<null> => {
     await removeMessage(placeholder.id);
-    broadcast("message:removed", { id: placeholder.id, channelId: channel.id });
+    broadcast("message:removed", { id: placeholder.id, channelId: channel.id }, owner);
     return null;
   };
   const finish = async (patch: Record<string, unknown>): Promise<MessageRow | null> => {
     const done = await updateMessageRow(placeholder.id, patch);
-    if (done) broadcast("message:updated", toMessage(done));
+    if (done) broadcast("message:updated", toMessage(done), owner);
     return done ?? null;
   };
   const postSystem = async (text: string): Promise<void> => {
-    const sys = await insertMessage({ channelId: channel.id, authorType: "system", content: text });
-    broadcast("message:created", toMessage(sys));
+    const sys = await insertMessage({ ownerId: owner, channelId: channel.id, authorType: "system", content: text });
+    broadcast("message:created", toMessage(sys), owner);
   };
 
   try {
     if (agent.kind === "image") {
-      const src = await generateImage(agent.model, await lastHumanPrompt(channel.id), controller.signal);
+      const src = await generateImage(owner, agent.model, await lastHumanPrompt(owner, channel.id), controller.signal);
       return { message: await finish({ image: src, status: "complete" }), spawnedIds: [] };
     }
 
-    const names: Names = new Map((await listAgents()).map((a) => [a.id, a.name]));
-    const members = await listMembers(channel.id);
-    const rows = (await listMessageRows(channel.id)).filter((m) => m.id > channel.compressed_through);
+    const names: Names = new Map((await listAgents(owner)).map((a) => [a.id, a.name]));
+    const members = await listMembers(owner, channel.id);
+    const rows = (await listMessageRows(owner, channel.id)).filter((m) => m.id > channel.compressed_through);
     const model = await resolveModel(agent, channel, rows);
     const system = await buildSystem(rows, channel, agent, members);
     const context = contextFrom(rows, agent, names);
 
-    const provider = await buildProvider(agent.providerKind);
+    const provider = await buildProvider(owner, agent.providerKind);
     // No temperature — Opus rejects sampling params. system is the first message.
     const messages: AiMessage[] = [{ role: "system", content: system }, ...context];
     for await (const chunk of provider.chatStream({ model, messages })) {
       if (stopped()) break; // @atlas/ai has no AbortSignal; gate on the epoch/abort flag
       if (chunk.type === "text" && chunk.content) {
         content += chunk.content;
-        broadcast("message:delta", { id: placeholder.id, channelId: channel.id, delta: chunk.content });
+        broadcast("message:delta", { id: placeholder.id, channelId: channel.id, delta: chunk.content }, owner);
       }
       if (chunk.type === "done") break;
     }
 
     // Record usage before any discard so directive-only turns still count.
     const promptText = `${system}\n${context.map((m) => m.content).join("\n")}`;
-    await recordUsage(agent.id, channel.id, model, estimateTokens(promptText), estimateTokens(content));
+    await recordUsage(owner, agent.id, channel.id, model, estimateTokens(promptText), estimateTokens(content));
 
     if (stopped()) {
       const clean = parseDirectives(content).clean;
@@ -189,7 +191,7 @@ export const runAgentTurn = async (channel: ChannelRow, agent: Agent): Promise<T
     }
     return { message: await finish({ content: `⚠️ couldn't respond: ${reason(err)}`, status: "error" }), spawnedIds: [] };
   } finally {
-    broadcast("agent:typing", { channelId: channel.id, agentId: agent.id, active: false });
+    broadcast("agent:typing", { channelId: channel.id, agentId: agent.id, active: false }, owner);
     unregister(channel.id, controller);
   }
 };

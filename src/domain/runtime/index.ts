@@ -37,7 +37,7 @@ const runOne = async (channel: ChannelRow, agent: Agent, cascade: Cascade): Prom
   let delegated = false;
   for (const id of spawnedIds) {
     if (!live(channel, cascade)) break;
-    const sub = await getAgentById(id);
+    const sub = await getAgentById(channel.owner_id, id);
     if (!sub) continue;
     delegated = true;
     if (mentioned.has(sub.handle)) continue;
@@ -46,7 +46,7 @@ const runOne = async (channel: ChannelRow, agent: Agent, cascade: Cascade): Prom
   }
 
   if (channel.head_agent_id != null && agent.id === channel.head_agent_id && !cascade.headSynthesized) {
-    const members = await listMembers(channel.id);
+    const members = await listMembers(channel.owner_id, channel.id);
     const delegatedByMention = [...mentioned].some((h) => members.some((m) => m.handle === h && m.id !== agent.id));
     if ((delegated || delegatedByMention) && live(channel, cascade)) {
       cascade.headSynthesized = true;

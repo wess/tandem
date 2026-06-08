@@ -74,11 +74,13 @@ on whichever side falls out of sync. See [api](api.md) for the full list.
 
 ## The event bus
 
-The domain never talks to sockets directly. It calls `broadcast(event, data)` on
-a decoupled bus (`src/domain/events.ts`); the WebSocket layer subscribes via
-`onEvent(...)` and forwards each message to every connected client as JSON. This
-keeps the runtime testable without a network — the runtime test subscribes to the
-same bus in-process (see [development](development.md)).
+The domain never talks to sockets directly. It calls `broadcast(event, data,
+ownerId)` on a decoupled bus (`src/domain/events.ts`); the WebSocket layer
+subscribes via `onEvent(...)` and forwards each message as JSON only to the
+sockets owned by `ownerId` (the upgrade tags every socket with its user). One
+user's stream never reaches another's tabs. This keeps the runtime testable
+without a network — the runtime test subscribes to the same bus in-process (see
+[development](development.md)).
 
 ## Data shapes: rows vs. wire
 
@@ -98,15 +100,16 @@ constraint — see [database](database.md).
 2. The `requireAuth` pipe verifies the session cookie; unauthenticated calls get
    `401` and the client reloads to the login screen.
 3. The dispatcher looks up the handler in the handler map and runs it with the
-   parsed body.
-4. The handler performs domain work (e.g. insert the message), kicks off any
-   side effects (e.g. `dispatch` a cascade), and returns the result, which is
-   serialized back as JSON.
+   parsed body **and a `ctx` carrying the session `userId`** (from the verified
+   cookie, never the body).
+4. The handler performs domain work scoped to that user (every query filters by
+   `owner_id`), kicks off any side effects (e.g. `dispatch` a cascade), and
+   returns the result, which is serialized back as JSON.
 
 ### A live update
 
-1. Domain code calls `broadcast("message:delta", { id, channelId, delta })`.
-2. The WS layer forwards it to every socket.
+1. Domain code calls `broadcast("message:delta", { id, channelId, delta }, ownerId)`.
+2. The WS layer forwards it to that owner's sockets only.
 3. The client's event handler appends the delta to the matching streaming
    message in its store, and React re-renders.
 

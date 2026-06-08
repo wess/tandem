@@ -3,9 +3,11 @@
 Tandem is a group-chat workspace where the only human is you and every other
 member is an AI agent bound to an LLM provider. Agents talk to you and to each
 other; a head agent can orchestrate a channel, delegate to specialists, and
-synthesize their work. It runs as one always-on web app — Bun host, React SPA,
-Postgres, WebSocket streaming — built on [Atlas](https://github.com/wess/atlas)
-and designed to live in a homelab behind [Castle](https://github.com/wess/castle).
+synthesize their work. Each user gets their own isolated workspace, so several
+people can share one server and never see each other's data. It runs as one
+always-on web app — Bun host, React SPA, Postgres, WebSocket streaming — built on
+[Atlas](https://github.com/wess/atlas) and designed to live in a homelab behind
+[Castle](https://github.com/wess/castle).
 
 ## Where to start
 
@@ -20,7 +22,7 @@ and designed to live in a homelab behind [Castle](https://github.com/wess/castle
 
 ## Reference
 
-- **[concepts](concepts.md)** — workspace, channels, agents, members, head agents, the one human.
+- **[concepts](concepts.md)** — per-user workspaces, channels, agents, members, head agents, one human per workspace.
 - **[architecture](architecture.md)** — process topology, layers, request lifecycle, data flow.
 - **[runtime](runtime.md)** — the cascade engine: trigger rules, turn loop, streaming, abort/epoch, invariants.
 - **[agents](agents.md)** — the agent model, kinds, templates, directives, subagents.
@@ -32,7 +34,7 @@ and designed to live in a homelab behind [Castle](https://github.com/wess/castle
 - **[usage](usage.md)** — token and cost tracking.
 - **[api](api.md)** — the RPC method + event contract.
 - **[database](database.md)** — schema, migrations, the snake_case constraint.
-- **[security](security.md)** — auth, the single-human model, key handling.
+- **[security](security.md)** — auth, per-user workspace isolation, key handling.
 - **[development](development.md)** — dev workflow, layout, testing, conventions.
 
 ## At a glance
@@ -51,6 +53,6 @@ and designed to live in a homelab behind [Castle](https://github.com/wess/castle
 
 - Code references look like `src/domain/runtime/run.ts` and are relative to the
   repository root.
-- "The human" means you — the single authenticated user.
+- "The human" means you — the authenticated user who owns the current workspace.
 - "Wire types" are the camelCase shapes in `src/shared/types.ts` that cross the
   network; "rows" are the snake_case database shapes.

@@ -1,13 +1,17 @@
 import type { ServerWebSocket } from "bun";
 import { onEvent } from "../domain/events.ts";
 
-// Single workspace: every connected client receives every event and filters by
-// channelId. Good enough for the one-human homelab model.
-const sockets = new Set<ServerWebSocket<undefined>>();
+// Per-tenant fan-out: each socket is tagged with the authenticated user id at
+// upgrade time, and an event is delivered only to sockets whose user owns it.
+// A user can have several tabs open, so we key a Set of sockets per user.
+export type WsData = { userId: number };
+const byUser = new Map<number, Set<ServerWebSocket<WsData>>>();
 
 onEvent((msg) => {
-  const data = JSON.stringify(msg);
-  for (const s of sockets) {
+  const targets = byUser.get(msg.ownerId);
+  if (!targets) return;
+  const data = JSON.stringify({ event: msg.event, data: msg.data });
+  for (const s of targets) {
     try {
       s.send(data);
     } catch {
@@ -17,13 +21,18 @@ onEvent((msg) => {
 });
 
 export const wsHandlers = {
-  open(ws: ServerWebSocket<undefined>) {
-    sockets.add(ws);
+  open(ws: ServerWebSocket<WsData>) {
+    const set = byUser.get(ws.data.userId) ?? new Set<ServerWebSocket<WsData>>();
+    set.add(ws);
+    byUser.set(ws.data.userId, set);
   },
-  close(ws: ServerWebSocket<undefined>) {
-    sockets.delete(ws);
+  close(ws: ServerWebSocket<WsData>) {
+    const set = byUser.get(ws.data.userId);
+    if (!set) return;
+    set.delete(ws);
+    if (set.size === 0) byUser.delete(ws.data.userId);
   },
-  message(_ws: ServerWebSocket<undefined>, _message: string | Buffer) {
+  message(_ws: ServerWebSocket<WsData>, _message: string | Buffer) {
     // client → server messages (none yet)
   },
 };

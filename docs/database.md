@@ -33,7 +33,7 @@ Defined in `src/db/schema.ts`.
 
 | Table | Purpose |
 |---|---|
-| `users` | The single human account (email, name, password hash) |
+| `users` | User accounts — one per person (email, name, password hash). Each owns an isolated workspace |
 | `agents` | Agents: handle, name, persona, provider/model, `parent_id` |
 | `channels` | Channels/projects/DMs: slug, kind, topic, `agent_id`, `head_agent_id`, `compressed_through` |
 | `members` | Agent↔channel membership |
@@ -42,7 +42,22 @@ Defined in `src/db/schema.ts`.
 | `skills` | Reusable procedures: name, steps, use count |
 | `schedules` | Recurring agent tasks: cadence, `next_run_at`, `enabled` |
 | `usagelog` | Per-turn token + cost ledger |
-| `settings` | Key/value store (provider keys, base URLs, default models) |
+| `settings` | Per-user key/value store (provider keys, base URLs, default models) |
+
+### Tenancy: `owner_id`
+
+Every workspace table — `agents`, `channels`, `members`, `messages`, `memories`,
+`skills`, `schedules`, `usagelog`, and `settings` — carries an `owner_id` that
+references `users(id)` with `ON DELETE CASCADE`. It is the spine of multi-tenancy:
+
+- Every read filters by `owner_id` and every insert stamps it, so one user can
+  never see or touch another user's rows. The session user id (from the cookie)
+  is the only source of `owner_id` — it's never taken from the request body.
+- Uniqueness is **per workspace**: `agents (owner_id, handle)`,
+  `channels (owner_id, slug)`, and `skills (owner_id, name)` are composite
+  uniques, and `settings` is keyed by the composite primary key `(owner_id, key)`.
+- `memories.scope = 'global'` means workspace-wide *for that user*, not across
+  the whole server.
 
 ### Notable columns
 
@@ -79,7 +94,11 @@ bun run migrate:down     # roll back the last migration
 Applied migrations are tracked in a `schema_migrations` table, so `up` is
 idempotent. The initial migration `0001_init` creates every table above plus the
 tsvector columns and indexes, with `DEFAULT now()` on timestamps (the DDL handles
-defaults the schema builder can't express in TypeScript).
+defaults the schema builder can't express in TypeScript). `0002_tenancy` adds the
+`owner_id` columns, the composite uniques, the per-user `settings` primary key,
+and the owner indexes — and (because it converts the app from a single shared
+workspace to per-user workspaces) **wipes existing workspace content** while
+keeping user accounts.
 
 ## Connection
 
@@ -95,6 +114,9 @@ inserts and re-selects the full row, since the builder returns the serial id.
 
 ## Seeding
 
-`bun run seed` (`src/db/seed.ts`) creates the single human from `ADMIN_EMAIL` /
+`bun run seed` (`src/db/seed.ts`) creates the first account from `ADMIN_EMAIL` /
 `ADMIN_PASSWORD`, hashing the password with `@atlas/auth`. It's safe to re-run —
-it won't duplicate an existing admin.
+it won't duplicate an existing admin. Additional accounts are created
+just-in-time on first SSO login; each one owns its own workspace. A user's
+`#general` channel is created lazily the first time they load the app, so the
+seed doesn't create any workspace content.

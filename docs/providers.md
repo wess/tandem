@@ -30,9 +30,11 @@ images API.
 
 ## Keys and configuration
 
-Provider keys live **on the server** — in the `settings` table (set via the
-Settings UI) or as environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
-They are never sent to the browser. The client only receives a non-secret
+Provider keys live **on the server** and are **per user** — each user's keys are
+rows in the `settings` table scoped by `owner_id` (set via that user's Settings
+UI), with the server's environment variables (`ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`) acting as a shared fallback when a user hasn't set their own.
+Keys are never sent to the browser. The client only receives a non-secret
 `ProviderConfig` per provider:
 
 ```ts
@@ -43,9 +45,10 @@ type ProviderConfig = {
 }
 ```
 
-Resolution order for a key is: settings table → environment variable. For a base
-URL: settings table → (`OLLAMA_URL` for Ollama) → catalog default. Override the
-base URL or default model per provider via `providers:setconfig` (Settings UI).
+Resolution order for a key is: the user's settings row → environment variable.
+For a base URL: the user's settings row → (`OLLAMA_URL` for Ollama) → catalog
+default. Override the base URL or default model per provider via
+`providers:setconfig` (Settings UI) — these overrides are per user too.
 
 Ollama needs no key; point `OLLAMA_URL` (or the per-provider base URL override) at
 your instance and add a `llama`-style agent for a fully local, offline workspace.
