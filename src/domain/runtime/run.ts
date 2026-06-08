@@ -12,7 +12,7 @@ import { insertMessage, listMessageRows, removeMessage, toMessage, updateMessage
 import { getChannelProject } from "../projects.ts";
 import { TIERS } from "../providers/catalog.ts";
 import { generateImage } from "../providers/images.ts";
-import { buildProvider } from "../providers/index.ts";
+import { buildProvider, modelFor } from "../providers/index.ts";
 import { recall } from "../search.ts";
 import { skillsDigest } from "../skills.ts";
 import { channelSpend, estimateTokens, recordUsage } from "../usage.ts";
@@ -55,6 +55,9 @@ const lastIncoming = (rows: MessageRow[], agent: Agent): string => {
 
 const resolveModel = async (agent: Agent, channel: ChannelRow, rows: MessageRow[]): Promise<string> => {
   if (agent.model !== "auto") return agent.model;
+  // Ollama has no cheap/strong split (and the tier default is just llama3.2) —
+  // honor the user's configured Ollama default model (e.g. an Ollama Cloud id).
+  if (agent.providerKind === "ollama") return modelFor(channel.owner_id, "ollama");
   const tier = TIERS[agent.providerKind];
   const prompt = lastIncoming(rows, agent);
   const complex = prompt.length > 280 || COMPLEX.test(prompt);

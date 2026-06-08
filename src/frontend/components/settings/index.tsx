@@ -21,7 +21,13 @@ const ProviderCard = ({ p }: { p: ProviderConfig }) => {
     setKey("");
     flash();
   };
+  // One Save persists everything: the key too (if entered), not just base
+  // URL + model — so you can't accidentally save config while dropping the key.
   const saveCfg = async () => {
+    if (key.trim()) {
+      await setProviderKey(p.kind, key.trim());
+      setKey("");
+    }
     await setProviderConfig(p.kind, { baseURL, defaultModel: model });
     flash();
   };
