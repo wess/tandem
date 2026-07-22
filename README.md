@@ -162,3 +162,5 @@ Bun · TypeScript · React 19 · Postgres · [Atlas](https://github.com/wess/atl
 ## License
 
 [Apache License 2.0](LICENSE).
+
+♥ [Sponsor this project](https://github.com/sponsors/wess)
